@@ -478,7 +478,7 @@ object FilesTarget {
             bitmap.recycle() // Recycle instantly without waiting for GC
             Icon.createWithBitmap(oriented)
         } catch (e: Exception) {
-            Log.w("FilesTarget", "Failed to decode thumbnail for $path", e)
+            Log.w("FilesTarget", "Failed to decode thumbnail", e)
             null
         }
     }
