@@ -1606,18 +1606,32 @@ public class QuickstepLauncher extends Launcher implements RecentsViewContainer,
         predictionRowView.dump(prefix, writer);
     }
 
+    /**
+     * Creates a TextClock or AnalogClock with an asynchronous ClockEventDelegate on Android U (API 34) and newer;
+     * on older platforms delegates to the framework's view creation.
+     *
+     * @return the created View for the given name when handled (TextClock or AnalogClock with delegate),
+     *         or the view returned by the superclass when not handled
+     */
     @Override
     public View onCreateView(View parent, String name, Context context, AttributeSet attrs) {
-        switch (name) {
-            case "TextClock", "android.widget.TextClock" -> {
-                TextClock tc = new TextClock(context, attrs);
-                tc.setClockEventDelegate(AsyncClockEventDelegate.INSTANCE.get(this));
-                return tc;
-            }
-            case "AnalogClock", "android.widget.AnalogClock" -> {
-                AnalogClock ac = new AnalogClock(context, attrs);
-                ac.setClockEventDelegate(AsyncClockEventDelegate.INSTANCE.get(this));
-                return ac;
+        // ClockEventDelegate / setClockEventDelegate were added in Android 14 (API 34); on older
+        // platforms we must fall back to the framework default to avoid loading classes that do
+        // not exist on the device (b/353166316, lawnchair issue #6781).
+        if (Utilities.ATLEAST_U) {
+            switch (name) {
+                case "TextClock", "android.widget.TextClock" -> {
+                    TextClock tc = new TextClock(context, attrs);
+                    tc.setClockEventDelegate(
+                            AsyncClockEventDelegate.INSTANCE.get(this).asClockEventDelegate());
+                    return tc;
+                }
+                case "AnalogClock", "android.widget.AnalogClock" -> {
+                    AnalogClock ac = new AnalogClock(context, attrs);
+                    ac.setClockEventDelegate(
+                            AsyncClockEventDelegate.INSTANCE.get(this).asClockEventDelegate());
+                    return ac;
+                }
             }
         }
         return super.onCreateView(parent, name, context, attrs);
