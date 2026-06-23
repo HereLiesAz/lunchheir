@@ -1,0 +1,35 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Lunch Heir — overlay applied as a normal build script (FALLBACK mechanism)
+//
+// Preferred mechanism is the init script (overlay/lunchheir.init.gradle), which keeps
+// upstream 100% pristine. If the init-script DSL timing ever proves unreliable on a
+// real build, use this instead by appending ONE line to the END of upstream's
+// `build.gradle` (the only upstream edit, trivially re-applied on update):
+//
+//     apply from: "$rootDir/../overlay/lunchheir-overlay.gradle"
+//
+// Running inside upstream's app build script, the `android { }` extension is directly
+// available here, so this is the most robust place to override identity.
+// ─────────────────────────────────────────────────────────────────────────────
+
+def lunchHeirOverlayDir = new File(rootDir, "../overlay").canonicalFile
+
+android {
+    def overlaySrc = new File(lunchHeirOverlayDir, "src")
+    if (overlaySrc.isDirectory()) {
+        sourceSets.named("main").configure { ss -> ss.java.srcDir(overlaySrc) }
+    }
+
+    def appIds = [
+            github : "com.hereliesaz.lunchheir",
+            nightly: "com.hereliesaz.lunchheir.nightly",
+            play   : "com.hereliesaz.lunchheir.play",
+    ]
+    appIds.each { flavorName, appId ->
+        def flavor = productFlavors.findByName(flavorName)
+        if (flavor != null) flavor.applicationId = appId
+    }
+
+    buildTypes.findByName("debug")?.resValue("string", "derived_app_name", "Lunch Heir (Debug)")
+    buildTypes.findByName("release")?.resValue("string", "derived_app_name", "Lunch Heir")
+}

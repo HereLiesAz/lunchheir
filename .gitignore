@@ -1,22 +1,10 @@
-db_files
+# Lunch Heir root ignore. Upstream Lawnchair has its own .gitignore inside upstream/.
+.idea/
 *.iml
-.project
-.classpath
-.project.properties
-**/gen
-tests/stress/gen
-WallpaperPicker/gen
-WallpaperPicker/.project.properties
-bin
-.idea
-.gradle
-.kotlin
+.gradle/
 local.properties
-build
+build/
 .DS_Store
-keystore.properties
-*.jks
-__pycache__
-.vscode
-.fleet
-lawnWithQuickstep/release
+
+# Source overlay is applied to the submodule working tree at build time; the resulting
+# dirty state of upstream/ is expected and should not be committed into the submodule.
