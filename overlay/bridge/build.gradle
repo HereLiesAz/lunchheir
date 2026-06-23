@@ -1,0 +1,36 @@
+// Lunch Heir Bridge — a standalone companion app, independent of the launcher build.
+//
+// It exposes the Google "launcher overlay" AIDL service so a release-signed Lunch Heir can
+// show the Google Discover ("-1") feed. The Google App only serves that overlay to system or
+// *debuggable* apps; a normal release launcher is neither, which is why the bridge must be a
+// separate, debuggable app (the same reason Rootless Pixel Bridge is separate). The shipped
+// artifact is the debug build (debuggable by default).
+//
+// Increment 1 is a buildable stub: it stands up the service + AIDL. The proxy that forwards to
+// the Google App's own overlay, plus a fixed signing key whose hash Lunch Heir whitelists in
+// FeedBridge, come in later increments.
+plugins {
+    id 'com.android.application' version '8.7.2'
+}
+
+android {
+    namespace 'com.hereliesaz.lunchheir.bridge'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.hereliesaz.lunchheir.bridge'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+    }
+
+    buildFeatures {
+        aidl true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="false"
+        android:label="Lunch Heir Bridge">
+
+        <!-- The launcher binds to this service to receive the Google Discover overlay.
+             Action/data scheme match what the launcher's LauncherClient sends
+             (com.android.launcher3.WINDOW_OVERLAY, app://<package>:<uid>). -->
+        <service
+            android:name=".OverlayService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.android.launcher3.WINDOW_OVERLAY" />
+                <data android:scheme="app" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>
