@@ -99,6 +99,33 @@ def main():
         applied_marker="LUNCHHEIR_INFO_FILE_NAME",
     )
 
+    # ── Home-screen extensions hook ─────────────────────────────────────────────
+    # A single line in LawnchairLauncher.onCreate hands control to the overlay so all
+    # Lunch Heir home logic (live recents bar, second hotseat, ...) lives in overlay/src.
+    launcher = upstream / "lawnchair/src/app/lawnchair/LawnchairLauncher.kt"
+    if not launcher.is_file():
+        sys.exit(f"ERROR: expected file missing: {launcher}")
+
+    edit_file(
+        launcher,
+        edits=[
+            (
+                "        layoutInflater.factory2 = LawnchairLayoutFactory(this)\n"
+                "        super.onCreate(savedInstanceState)\n"
+                "\n"
+                "        prefs.launcherTheme.subscribeChanges(this, ::updateTheme)\n",
+                "        layoutInflater.factory2 = LawnchairLayoutFactory(this)\n"
+                "        super.onCreate(savedInstanceState)\n"
+                "\n"
+                "        // LunchHeir: initialize home-screen extensions (live recents bar, etc.)\n"
+                "        app.lawnchair.lunchheir.LunchHeirHome.onCreate(this)\n"
+                "\n"
+                "        prefs.launcherTheme.subscribeChanges(this, ::updateTheme)\n",
+            ),
+        ],
+        applied_marker="app.lawnchair.lunchheir.LunchHeirHome",
+    )
+
     print("Done.")
 
 
