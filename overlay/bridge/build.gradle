@@ -29,6 +29,16 @@ android {
         aidl true
     }
 
+    buildTypes {
+        release {
+            // The Google App only serves the overlay to system or *debuggable* apps, so the
+            // shipped bridge must be debuggable even in release. Sign the release bridge with
+            // the SAME key as the launcher: FeedBridge then trusts it by signature match
+            // (no hardcoded signature hash needed). See the launcher-side FeedBridge patch.
+            debuggable true
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
