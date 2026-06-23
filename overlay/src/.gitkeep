@@ -1,0 +1,4 @@
+# Lunch Heir feature source (Kotlin/Java) goes here in later phases.
+# Injected into the app's `main` source set by overlay/lunchheir.init.gradle.
+# Use the same package namespace as upstream (app.lawnchair / com.android.launcher3)
+# so the classes link against upstream without renaming anything.

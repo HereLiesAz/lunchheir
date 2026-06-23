@@ -1,0 +1,70 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Lunch Heir — Gradle init-script overlay
+//
+// This file injects Lunch Heir's branding and source into the *pristine* upstream
+// Lawnchair build (the `upstream/` git submodule) without editing any upstream file.
+//
+// It is applied at build time, e.g. (run from the repo root):
+//     cd upstream && ./gradlew --init-script ../overlay/lunchheir.init.gradle \
+//         assembleLawnWithQuickstepGithubDebug
+// or use ../build-lunchheir.sh which wraps this.
+//
+// When built this way, `rootDir` == the upstream submodule dir, so the overlay
+// lives at `../overlay` relative to it.
+//
+// What it does:
+//   1. Adds overlay/src to the app's `main` source set (for later-phase features).
+//   2. Overrides the applicationId on every release channel -> com.hereliesaz.lunchheir.
+//   3. Overrides the launcher label (derived_app_name resValue) -> "Lunch Heir".
+//
+// NOTE: This has not been built in the authoring environment (egress policy blocks
+// cloning upstream there). If the `androidComponents`/DSL timing needs adjustment on
+// a real build, the documented fallback is a single `apply from:` line appended to
+// upstream's build.gradle pointing at overlay/lunchheir-overlay.gradle — see README.
+// ─────────────────────────────────────────────────────────────────────────────
+
+def lunchHeirAppIds = [
+        github : "com.hereliesaz.lunchheir",
+        nightly: "com.hereliesaz.lunchheir.nightly",
+        play   : "com.hereliesaz.lunchheir.play",
+]
+
+gradle.rootProject {
+    // `rootDir` is a Project property, so it is resolved here (inside the rootProject
+    // closure), not at the init script's top level where no project exists yet.
+    def lunchHeirOverlayDir = new File(rootDir, "../overlay").canonicalFile
+
+    plugins.withId("com.android.application") {
+        def android = extensions.getByName("android")
+
+        // 1) Inject Lunch Heir overlay sources (empty in the Foundation; used later).
+        def overlaySrc = new File(lunchHeirOverlayDir, "src")
+        if (overlaySrc.isDirectory()) {
+            android.sourceSets.named("main").configure { ss ->
+                ss.java.srcDir(overlaySrc)
+            }
+        }
+    }
+
+    // Override identity after upstream's android {} block has been evaluated, so our
+    // values win. Done here (not via a new flavor) to avoid reshaping the variant matrix.
+    afterEvaluate {
+        def android = extensions.findByName("android")
+        if (android == null) return
+
+        // 2) applicationId per channel flavor (build types still add their suffixes).
+        lunchHeirAppIds.each { flavorName, appId ->
+            def flavor = android.productFlavors.findByName(flavorName)
+            if (flavor != null) {
+                flavor.applicationId = appId
+            }
+        }
+
+        // 3) Launcher label. Upstream sets derived_app_name via resValue on the build
+        //    types; re-setting the same key overwrites it.
+        def debug = android.buildTypes.findByName("debug")
+        if (debug != null) debug.resValue("string", "derived_app_name", "Lunch Heir (Debug)")
+        def release = android.buildTypes.findByName("release")
+        if (release != null) release.resValue("string", "derived_app_name", "Lunch Heir")
+    }
+}
