@@ -23,8 +23,6 @@
 // upstream's build.gradle pointing at overlay/lunchheir-overlay.gradle — see README.
 // ─────────────────────────────────────────────────────────────────────────────
 
-def lunchHeirOverlayDir = new File(rootDir, "../overlay").canonicalFile
-
 def lunchHeirAppIds = [
         github : "com.hereliesaz.lunchheir",
         nightly: "com.hereliesaz.lunchheir.nightly",
@@ -32,6 +30,10 @@ def lunchHeirAppIds = [
 ]
 
 gradle.rootProject {
+    // `rootDir` is a Project property, so it is resolved here (inside the rootProject
+    // closure), not at the init script's top level where no project exists yet.
+    def lunchHeirOverlayDir = new File(rootDir, "../overlay").canonicalFile
+
     plugins.withId("com.android.application") {
         def android = extensions.getByName("android")
 

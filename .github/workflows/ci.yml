@@ -27,8 +27,6 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: upstream
 
       - name: Apply Lunch Heir source overlay
         run: overlay/apply-overlay.sh
