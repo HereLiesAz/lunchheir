@@ -2,3 +2,7 @@
 	path = upstream
 	url = https://github.com/LawnchairLauncher/lawnchair
 	branch = 16-dev
+	# The Lunch Heir source overlay (overlay/apply_overlay.py) edits the submodule
+	# working tree at build time; ignore that dirtiness so the parent repo stays clean.
+	# (Commit-pointer changes are still shown, so submodule bumps remain visible.)
+	ignore = dirty

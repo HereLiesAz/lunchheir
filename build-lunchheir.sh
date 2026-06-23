@@ -24,6 +24,12 @@ if [ ${#TASK_ARGS[@]} -eq 0 ]; then
   TASK_ARGS=(assembleLawnWithQuickstepGithubDebug)
 fi
 
+# If the SDK location is configured at the repo root, hand it to the nested build.
+if [ -f "$ROOT/local.properties" ] && [ ! -f "$ROOT/upstream/local.properties" ]; then
+  cp "$ROOT/local.properties" "$ROOT/upstream/local.properties"
+fi
+
 # Build with upstream as the Gradle root, injecting branding/config via the init script.
 cd "$ROOT/upstream"
+chmod +x gradlew
 exec ./gradlew --init-script "$ROOT/overlay/lunchheir.init.gradle" "${TASK_ARGS[@]}"
