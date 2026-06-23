@@ -28,18 +28,26 @@ object LunchHeirHome {
     fun onCreate(launcher: LawnchairLauncher) {
         val recentsModel = RecentsModel.INSTANCE.get(launcher)
 
-        // QuickStep notifies on the UI thread when the recent-task list changes; re-query and
-        // (for now) just log. The live recents bar will rebind its icons from this callback.
-        val listener = RecentsModel.RecentTasksChangedListener {
-            recentsModel.getTasks { tasks ->
-                Log.d(TAG, "recent tasks changed: ${tasks.size} task group(s)")
-            }
-        }
-        recentsModel.registerRecentTasksChangedListener(listener)
-
+        // Only listen while the launcher is actually visible: registering for the whole
+        // create..destroy span keeps firing getTasks() binder IPC in the background (wasting
+        // CPU/battery). Bind register/unregister to start/stop, and query once on start so the
+        // bar is up to date when the user returns home. QuickStep calls back on the UI thread.
         launcher.lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onDestroy(owner: LifecycleOwner) {
+            private val listener = RecentsModel.RecentTasksChangedListener { queryTasks() }
+
+            override fun onStart(owner: LifecycleOwner) {
+                recentsModel.registerRecentTasksChangedListener(listener)
+                queryTasks()
+            }
+
+            override fun onStop(owner: LifecycleOwner) {
                 recentsModel.unregisterRecentTasksChangedListener(listener)
+            }
+
+            private fun queryTasks() {
+                recentsModel.getTasks { tasks ->
+                    Log.d(TAG, "recent tasks changed: ${tasks.size} task group(s)")
+                }
             }
         })
 
