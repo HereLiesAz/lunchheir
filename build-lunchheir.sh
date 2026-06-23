@@ -29,7 +29,8 @@ if [ -f "$ROOT/local.properties" ] && [ ! -f "$ROOT/upstream/local.properties" ]
   cp "$ROOT/local.properties" "$ROOT/upstream/local.properties"
 fi
 
-# Build with upstream as the Gradle root, injecting branding/config via the init script.
+# Build with upstream as the Gradle root. The overlay (branding + source dirs) is applied
+# by overlay/apply_overlay.py, which appends an `apply from:` line to upstream/build.gradle.
 cd "$ROOT/upstream"
 chmod +x gradlew
-exec ./gradlew --init-script "$ROOT/overlay/lunchheir.init.gradle" "${TASK_ARGS[@]}"
+exec ./gradlew "${TASK_ARGS[@]}"

@@ -33,7 +33,7 @@ jobs:
 
       - name: Assemble Lunch Heir (github debug)
         working-directory: upstream
-        run: ./gradlew --init-script ../overlay/lunchheir.init.gradle assembleLawnWithQuickstepGithubDebug
+        run: ./gradlew assembleLawnWithQuickstepGithubDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

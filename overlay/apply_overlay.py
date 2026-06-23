@@ -24,6 +24,20 @@ from pathlib import Path
 Edit = tuple
 
 
+def append_once(path: Path, marker: str, text_to_append: str) -> bool:
+    """Append text to a file unless `marker` is already present. Idempotent."""
+    text = path.read_text(encoding="utf-8")
+    if marker in text:
+        print(f"  already applied: {path.name} (append)")
+        return False
+    if not text.endswith("\n"):
+        text += "\n"
+    text += text_to_append
+    path.write_text(text, encoding="utf-8")
+    print(f"  appended to: {path.name}")
+    return True
+
+
 def edit_file(path: Path, edits, applied_marker: str) -> bool:
     text = path.read_text(encoding="utf-8")
     if applied_marker in text:
@@ -124,6 +138,22 @@ def main():
             ),
         ],
         applied_marker="app.lawnchair.lunchheir.LunchHeirHome",
+    )
+
+    # ── Apply the Lunch Heir Gradle overlay ─────────────────────────────────────
+    # Append one line to the app build script so Lunch Heir branding (applicationId,
+    # label) and overlay source dirs are configured in the normal config phase. This
+    # is the primary mechanism; the build no longer needs --init-script.
+    build_gradle = upstream / "build.gradle"
+    if not build_gradle.is_file():
+        sys.exit(f"ERROR: expected file missing: {build_gradle}")
+    append_once(
+        build_gradle,
+        marker="lunchheir-overlay.gradle",
+        text_to_append=(
+            "\n// LunchHeir: apply the Lunch Heir overlay (branding + overlay source dirs)\n"
+            'apply from: "$rootDir/../overlay/lunchheir-overlay.gradle"\n'
+        ),
     )
 
     print("Done.")
