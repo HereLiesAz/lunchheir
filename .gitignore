@@ -5,6 +5,8 @@
 local.properties
 build/
 .DS_Store
+__pycache__/
+*.pyc
 
 # Source overlay is applied to the submodule working tree at build time; the resulting
 # dirty state of upstream/ is expected and should not be committed into the submodule.
