@@ -1,0 +1,7 @@
+# Release pipeline drops the built bridge APK here as `lunchheir-bridge.apk`.
+# lunchheir-overlay.gradle bundles this dir into the launcher's assets, and
+# app.lawnchair.lunchheir.LunchHeirBridge installs it on request.
+#
+# To bundle it: build the bridge (overlay/bridge: `gradle assembleRelease`, signed with the
+# SAME key as the launcher), then copy the APK here as lunchheir-bridge.apk before building
+# the launcher. When this dir has only this file, nothing is bundled and install is a no-op.

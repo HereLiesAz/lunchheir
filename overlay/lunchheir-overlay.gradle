@@ -26,6 +26,14 @@ android {
         }
     }
 
+    // Bundle the Lunch Heir Bridge APK as an asset if a release pipeline placed it here
+    // (overlay/bridge-dist/lunchheir-bridge.apk). LunchHeirBridge installs it on request.
+    // When absent, nothing is bundled and the installer simply no-ops.
+    def bridgeDist = new File(lunchHeirOverlayDir, "bridge-dist")
+    if (bridgeDist.isDirectory()) {
+        sourceSets.named("main").configure { ss -> ss.assets.srcDir(bridgeDist) }
+    }
+
     def appIds = [
             github : "com.hereliesaz.lunchheir",
             nightly: "com.hereliesaz.lunchheir.nightly",

@@ -179,6 +179,23 @@ def main():
         applied_marker="com.hereliesaz.lunchheir.bridge",
     )
 
+    # ── Manifest: permission to install the bundled bridge ──────────────────────
+    manifest = upstream / "lawnchair/AndroidManifest.xml"
+    if not manifest.is_file():
+        sys.exit(f"ERROR: expected file missing: {manifest}")
+    edit_file(
+        manifest,
+        edits=[
+            (
+                '    <uses-permission android:name="android.permission.INTERNET" />\n',
+                '    <uses-permission android:name="android.permission.INTERNET" />\n'
+                "    <!-- LunchHeir: install the bundled Lunch Heir Bridge companion -->\n"
+                '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n',
+            ),
+        ],
+        applied_marker="REQUEST_INSTALL_PACKAGES",
+    )
+
     # ── Apply the Lunch Heir Gradle overlay ─────────────────────────────────────
     # Append one line to the app build script so Lunch Heir branding (applicationId,
     # label) and overlay source dirs are configured in the normal config phase. This
