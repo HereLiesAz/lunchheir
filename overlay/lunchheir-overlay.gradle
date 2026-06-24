@@ -53,3 +53,12 @@ dependencies {
     // jitpack is already configured in the upstream settings.gradle repositories.
     implementation 'com.github.HereLiesAz:AzNavRail:10.11'
 }
+
+// Lawnchair runs the cash.licensee plugin to validate dependency licenses. AzNavRail is
+// published via jitpack without SPDX license metadata in its POM, so allow it explicitly
+// (it's a first-party HereLiesAz library).
+licensee {
+    allowDependency('com.github.HereLiesAz', 'AzNavRail', '10.11') {
+        because 'First-party Lunch Heir UI library (jitpack POM lacks SPDX license metadata)'
+    }
+}
