@@ -14,7 +14,6 @@ import app.lawnchair.ui.preferences.navigation.Root
 import app.lawnchair.views.ComposeBottomSheet
 import com.android.launcher3.LauncherState
 import com.hereliesaz.aznavrail.AzButton
-import com.hereliesaz.aznavrail.AzButtonShape
 
 /**
  * The Hax-style menu — a summoned, flat, typography-forward menu, built from the AzNavRail
@@ -80,7 +79,5 @@ private fun HaxEntry(text: String, onClick: () -> Unit) {
         onClick = onClick,
         text = text,
         modifier = Modifier.fillMaxWidth(),
-        shape = AzButtonShape.RECTANGLE,
-        contentPadding = PaddingValues(20.dp),
     )
 }
