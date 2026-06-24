@@ -46,8 +46,12 @@ A group is created by converting an existing Lawnchair folder — reuse folder c
   a group row in the folder's cell sized to its children, reparent each child into the group with
   relative cells, delete the empty folder row, force a model reload. Touches only `ModelWriter`
   (no loader internals) → additive/rebase-safe.
-- The menu entry — one tracked `apply_overlay.py` seam into the folder options UI that calls
-  `promote(...)`. (Pending: written against the real folder-options source.)
+- The menu entry — a one-line `apply_overlay.py` seam: long-pressing an open folder's label calls
+  `GroupPromotion.onFolderLabelLongPress`, which offers **Smart group** / **Plain group** / Cancel.
+- **Smart group** runs `SmartGroupSeeder.fill` after the conversion: the group's apps seed
+  `SmartFill.suggest`, matching installed apps are minted as workspace items (`AppInfo.makeWorkspaceItem`)
+  and added, the group is resized to fit, and the suggested title applied — all off the main thread,
+  then one model reload. (Continuous re-evaluation on later installs/edits is the next step.)
 
 ## Smart auto-fill (AI) — "Smart Group / Smart Folder"
 Applies to **both folders and groups**. The title and the app set are **mutually- and

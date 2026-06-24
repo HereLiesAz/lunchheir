@@ -2,11 +2,13 @@ package app.lawnchair.lunchheir.group
 
 import android.app.AlertDialog
 import android.content.Context
+import androidx.lifecycle.lifecycleScope
 import app.lawnchair.LawnchairLauncher
 import app.lawnchair.lunchheir.LunchHeirPrefs
 import com.android.launcher3.Launcher
 import com.android.launcher3.model.data.FolderInfo
 import com.android.launcher3.model.data.ItemInfo
+import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.sqrt
 
@@ -42,16 +44,35 @@ object GroupPromotion {
             .setTitle("Convert to group")
             .setMessage(
                 "Turn “$name” into a Lunch Heir group? Its apps render inline on the home screen " +
-                    "and the group never collapses.",
+                    "and the group never collapses.\n\nA smart group also pulls in other installed " +
+                    "apps that fit the pattern and auto-names itself.",
             )
-            .setPositiveButton("Convert") { _, _ -> promote(launcher, folder) }
+            .setPositiveButton("Smart group") { _, _ -> promoteSmart(launcher, folder) }
+            .setNeutralButton("Plain group") { _, _ -> promote(launcher, folder) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
         return true
     }
 
+    /** Promote, then smart-fill the new group off the main thread; one reload covers both. */
+    @JvmStatic
+    fun promoteSmart(launcher: LawnchairLauncher, folder: FolderInfo) {
+        val group = convert(launcher, folder)
+        launcher.lifecycleScope.launch {
+            SmartGroupSeeder.fill(launcher, group)
+            launcher.model.forceReload()
+        }
+    }
+
     @JvmStatic
     fun promote(launcher: LawnchairLauncher, folder: FolderInfo) {
+        convert(launcher, folder)
+        // Rebind the workspace so the new group renders in place of the folder.
+        launcher.model.forceReload()
+    }
+
+    /** The model surgery: folder -> group, reparent children, drop the folder row. No reload. */
+    private fun convert(launcher: LawnchairLauncher, folder: FolderInfo): GroupInfo {
         val writer = launcher.modelWriter
         val children = ArrayList<ItemInfo>(folder.getContents())
 
@@ -74,8 +95,6 @@ object GroupPromotion {
 
         // Children are already reparented, so this removes only the empty folder row.
         writer.deleteItemFromDatabase(folder, "promoted to Lunch Heir group")
-
-        // Rebind the workspace so the new group renders in place of the folder.
-        launcher.model.forceReload()
+        return group
     }
 }
