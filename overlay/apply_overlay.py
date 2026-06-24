@@ -196,6 +196,69 @@ def main():
         applied_marker="REQUEST_INSTALL_PACKAGES",
     )
 
+    # ── Groups: load + render (additive, dormant until a group row exists) ──────
+    # Route ITEM_TYPE_GROUP rows through the folder/app-pair processor, upgrade the placeholder
+    # to a GroupInfo (keeping its multi-cell span), and inflate a GroupView for it. All branches
+    # are new (only fire for the new type), so existing item loading is unchanged.
+    wip = upstream / "src/com/android/launcher3/model/WorkspaceItemProcessor.kt"
+    if not wip.is_file():
+        sys.exit(f"ERROR: expected file missing: {wip}")
+    edit_file(
+        wip,
+        edits=[
+            (
+                "                Favorites.ITEM_TYPE_FOLDER,\n"
+                "                Favorites.ITEM_TYPE_APP_PAIR -> processFolderOrAppPair()\n",
+                "                Favorites.ITEM_TYPE_FOLDER,\n"
+                "                Favorites.ITEM_TYPE_APP_PAIR -> processFolderOrAppPair()\n"
+                "                app.lawnchair.lunchheir.group.GroupInfo.ITEM_TYPE_GROUP -> processFolderOrAppPair()\n",
+            ),
+            (
+                "        c.applyCommonProperties(collection)\n"
+                "        // Do not trim the folder label, as is was set by the user.\n"
+                "        collection.title = c.getString(c.mTitleIndex)\n"
+                "        collection.spanX = 1\n"
+                "        collection.spanY = 1\n",
+                "        // LunchHeir: upgrade the placeholder Folder to a Group, which renders inline and keeps\n"
+                "        // its multi-cell span (unlike folders/app-pairs, forced to 1x1 below).\n"
+                "        if (c.itemType == app.lawnchair.lunchheir.group.GroupInfo.ITEM_TYPE_GROUP && collection is FolderInfo) {\n"
+                "            val newGroup = app.lawnchair.lunchheir.group.GroupInfo()\n"
+                "            collection.getContents().forEach(newGroup::add)\n"
+                "            collection = newGroup\n"
+                "        }\n"
+                "\n"
+                "        c.applyCommonProperties(collection)\n"
+                "        // Do not trim the folder label, as is was set by the user.\n"
+                "        collection.title = c.getString(c.mTitleIndex)\n"
+                "        if (collection !is app.lawnchair.lunchheir.group.GroupInfo) {\n"
+                "            collection.spanX = 1\n"
+                "            collection.spanY = 1\n"
+                "        }\n",
+            ),
+        ],
+        applied_marker="app.lawnchair.lunchheir.group.GroupInfo",
+    )
+
+    inflater = upstream / "src/com/android/launcher3/util/ItemInflater.kt"
+    if not inflater.is_file():
+        sys.exit(f"ERROR: expected file missing: {inflater}")
+    edit_file(
+        inflater,
+        edits=[
+            (
+                '            else -> throw RuntimeException("Invalid Item Type")\n',
+                "            app.lawnchair.lunchheir.group.GroupInfo.ITEM_TYPE_GROUP ->\n"
+                "                return app.lawnchair.lunchheir.group.GroupView.inflate(\n"
+                "                    context,\n"
+                "                    parent,\n"
+                "                    item as app.lawnchair.lunchheir.group.GroupInfo,\n"
+                "                )\n"
+                '            else -> throw RuntimeException("Invalid Item Type")\n',
+            ),
+        ],
+        applied_marker="app.lawnchair.lunchheir.group.GroupView",
+    )
+
     # ── Apply the Lunch Heir Gradle overlay ─────────────────────────────────────
     # Append one line to the app build script so Lunch Heir branding (applicationId,
     # label) and overlay source dirs are configured in the normal config phase. This
