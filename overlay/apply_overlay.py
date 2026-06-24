@@ -259,6 +259,27 @@ def main():
         applied_marker="app.lawnchair.lunchheir.group.GroupView",
     )
 
+    # ── Nested folders: let a folder be dropped into a folder (gated, opt-in) ────
+    # FolderInfo.willAcceptItemType decides what a folder accepts (drag-drop, and FolderInfo.add);
+    # it excludes folders. Accept ITEM_TYPE_FOLDER when nesting is on, reusing all of Launcher3's
+    # existing drag-to-folder machinery for creation. Context-free static -> read the cached flag.
+    folderinfo = upstream / "src/com/android/launcher3/model/data/FolderInfo.java"
+    if not folderinfo.is_file():
+        sys.exit(f"ERROR: expected file missing: {folderinfo}")
+    edit_file(
+        folderinfo,
+        edits=[
+            (
+                "                || itemType == ITEM_TYPE_APP_PAIR;\n",
+                "                || itemType == ITEM_TYPE_APP_PAIR\n"
+                "                // LunchHeir: accept a folder into a folder when nesting is enabled (opt-in)\n"
+                "                || (itemType == LauncherSettings.Favorites.ITEM_TYPE_FOLDER\n"
+                "                    && app.lawnchair.lunchheir.folder.NestedFolders.isAccepting());\n",
+            ),
+        ],
+        applied_marker="app.lawnchair.lunchheir.folder.NestedFolders.isAccepting",
+    )
+
     # ── Nested folders: allow a folder as a child of a collection (gated, opt-in) ─
     # checkAndAddItem only attaches app/shortcut/app-pair children to their container; folders are
     # excluded, which blocks nesting. Add ITEM_TYPE_FOLDER, gated by NestedFolders.isEnabled so the

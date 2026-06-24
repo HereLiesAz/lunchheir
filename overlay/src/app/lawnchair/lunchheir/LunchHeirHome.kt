@@ -29,6 +29,9 @@ object LunchHeirHome {
     fun onCreate(launcher: LawnchairLauncher) {
         val rowHeightPx = (56 * launcher.resources.displayMetrics.density).toInt()
 
+        // Cache the nested-folders accept flag for the context-free FolderInfo seam (drag accept).
+        app.lawnchair.lunchheir.folder.NestedFolders.refresh(launcher)
+
         // Each feature gates on its own toggle. With all of them off, nothing below is attached and
         // the user is left with plain Lawnchair (there is no master switch by design).
         if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.LIVE_RECENTS_BAR)) {
