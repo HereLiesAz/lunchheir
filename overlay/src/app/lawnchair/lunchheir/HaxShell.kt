@@ -4,18 +4,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -29,6 +26,7 @@ import app.lawnchair.ui.preferences.navigation.Root
 import app.lawnchair.views.ComposeBottomSheet
 import com.android.launcher3.LauncherState
 import com.hereliesaz.aznavrail.AzButton
+import kotlinx.coroutines.launch
 
 /**
  * The Hax-style menu — a summoned, flat, typography-forward menu, built from the AzNavRail
@@ -95,22 +93,25 @@ private val HaxPaper = Color(0xFFF4F4F4)
 
 @Composable
 internal fun HaxEntry(text: String, onClick: () -> Unit) {
-    // Kinetic entrance: each word springs up and fades in when the menu opens.
-    var shown by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (shown) 1f else 0.8f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow,
-        ),
-        label = "haxScale",
-    )
-    val alpha by animateFloatAsState(
-        targetValue = if (shown) 1f else 0f,
-        animationSpec = tween(durationMillis = 300),
-        label = "haxAlpha",
-    )
-    LaunchedEffect(Unit) { shown = true }
+    // Kinetic entrance: each word springs up and fades in when the menu opens. Animatables read
+    // inside graphicsLayer update the layer without recomposing per frame. Scale uses a bouncy
+    // spring; alpha uses a plain tween so the fade can't overshoot past 1.
+    val scaleAnim = remember { Animatable(0.8f) }
+    val alphaAnim = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        launch {
+            scaleAnim.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow,
+                ),
+            )
+        }
+        launch {
+            alphaAnim.animateTo(targetValue = 1f, animationSpec = tween(durationMillis = 300))
+        }
+    }
 
     AzButton(
         onClick = onClick,
@@ -130,9 +131,9 @@ internal fun HaxEntry(text: String, onClick: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    this.alpha = alpha
+                    scaleX = scaleAnim.value
+                    scaleY = scaleAnim.value
+                    alpha = alphaAnim.value
                 },
             )
         },
