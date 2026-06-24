@@ -42,18 +42,26 @@ class LiveRecentsBar(context: Context) : HorizontalScrollView(context) {
         addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
-    /** Rebind the row to the current recent tasks. RecentsModel returns least-recent first. */
+    /**
+     * Rebind the row to the current recent tasks (RecentsModel returns least-recent first).
+     * Existing icon views are reused by task id (kept in the view tag) so a rebind doesn't churn
+     * views / reload icons / flicker — only genuinely new tasks create a view.
+     */
     fun setTasks(groupTasks: List<GroupTask>) {
+        val existing = (0 until row.childCount)
+            .map { row.getChildAt(it) }
+            .associateBy { it.tag as? Int }
         row.removeAllViews()
         groupTasks.asReversed().forEach { group ->
             val task = group.tasks.firstOrNull() ?: return@forEach
-            row.addView(createTaskIcon(task))
+            row.addView(existing[task.key.id] ?: createTaskIcon(task))
         }
     }
 
     @SuppressLint("ClickableViewAccessibility")
     private fun createTaskIcon(task: Task): View {
         val iconView = ImageView(context).apply {
+            tag = task.key.id
             layoutParams = LinearLayout.LayoutParams(iconSizePx, iconSizePx).apply {
                 marginStart = iconMarginPx
                 marginEnd = iconMarginPx
@@ -62,20 +70,24 @@ class LiveRecentsBar(context: Context) : HorizontalScrollView(context) {
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
 
+        // getIconInBackground dispatches its callback on the UI thread, so update directly.
         iconCache.getIconInBackground(task) { icon, contentDescription, _ ->
-            iconView.post {
-                iconView.setImageDrawable(icon)
-                iconView.contentDescription = contentDescription
-            }
+            iconView.setImageDrawable(icon)
+            iconView.contentDescription = contentDescription
         }
 
-        // Tap launches; an upward fling dismisses. Returning false for everything else lets the
-        // HorizontalScrollView still scroll the row.
+        // Launch via a real OnClickListener (so TalkBack works); the gesture detector routes a
+        // tap through performClick() and treats an upward fling as dismiss. onDown must return
+        // true or the detector never sees the tap/fling. Other events return false so the
+        // HorizontalScrollView can still scroll the row.
+        iconView.setOnClickListener { launchTask(task) }
         val detector = GestureDetector(
             context,
             object : GestureDetector.SimpleOnGestureListener() {
+                override fun onDown(e: MotionEvent): Boolean = true
+
                 override fun onSingleTapUp(e: MotionEvent): Boolean {
-                    launchTask(task)
+                    iconView.performClick()
                     return true
                 }
 
