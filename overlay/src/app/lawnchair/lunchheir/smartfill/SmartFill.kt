@@ -40,8 +40,9 @@ object SmartFill {
         val candidates = InstalledAppsSource(context).all()
         val baseline = engine.converge(seeds, candidates, title)
 
-        val provider = SmartFillConfig(context).provider()
-            ?: return@withContext baseline
+        val config = SmartFillConfig(context)
+        if (!config.cloudEnabled) return@withContext baseline
+        val provider = config.provider() ?: return@withContext baseline
         SmartFillRemote(provider).refine(seeds, candidates, title) ?: baseline
     }
 }

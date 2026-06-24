@@ -20,9 +20,12 @@ class SmartFillConfig(context: Context) {
         get() = prefs.getBoolean(KEY_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_ENABLED, value).apply()
 
-    /** Build the configured provider, or null if cloud is off / not enough is set to call out. */
+    /**
+     * Build the stored provider, or null if not enough is set to call out. Independent of
+     * [cloudEnabled] so a settings UI can prefill the saved fields while the toggle is off; callers
+     * gate on [cloudEnabled] separately before using it.
+     */
     fun provider(): AiProvider? {
-        if (!cloudEnabled) return null
         val baseUrl = prefs.getString(KEY_BASE_URL, null)?.takeIf { it.isNotBlank() } ?: return null
         val model = prefs.getString(KEY_MODEL, null)?.takeIf { it.isNotBlank() } ?: return null
         val format = runCatching { AiProvider.Format.valueOf(prefs.getString(KEY_FORMAT, null) ?: "") }
