@@ -25,6 +25,9 @@ class InstalledAppsSource(private val context: Context) {
 
         val result = ArrayList<AppSignals>()
         for (user in userManager.userProfiles) {
+            // Serial number is the stable, documented per-user identifier (UserHandle.hashCode is
+            // not contractually stable); keeps each profile's component keys unique and durable.
+            val userSerial = userManager.getSerialNumberForUser(user)
             for (info in launcherApps.getActivityList(null, user)) {
                 val appInfo = info.applicationInfo
                 val pkg = appInfo.packageName
@@ -38,7 +41,7 @@ class InstalledAppsSource(private val context: Context) {
                 }
                 result.add(
                     AppSignals(
-                        key = info.componentName.flattenToString() + "#" + user.hashCode(),
+                        key = info.componentName.flattenToString() + "#" + userSerial,
                         packageName = pkg,
                         label = info.label.toString(),
                         category = appInfo.category,

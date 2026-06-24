@@ -1,6 +1,8 @@
 package app.lawnchair.lunchheir.smartfill
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Facade tying the candidate source ([InstalledAppsSource]) to the on-device engine
@@ -20,13 +22,14 @@ object SmartFill {
      * Suggest a membership + title for a collection from its current [seeds] and an optional
      * user-set [title], scoring against everything installed. A user title steers but is preserved.
      */
-    fun suggest(
+    suspend fun suggest(
         context: Context,
         seeds: List<AppSignals>,
         title: String? = null,
         engine: SmartFillEngine = SmartFillEngine(),
-    ): SmartFillEngine.Result {
+    ): SmartFillEngine.Result = withContext(Dispatchers.IO) {
+        // IO dispatcher: all() makes per-app binder IPC; the converge() scoring is light CPU on top.
         val candidates = InstalledAppsSource(context).all()
-        return engine.converge(seeds, candidates, title)
+        engine.converge(seeds, candidates, title)
     }
 }
