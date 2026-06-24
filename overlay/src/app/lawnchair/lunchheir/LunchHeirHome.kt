@@ -27,14 +27,24 @@ object LunchHeirHome {
     @JvmStatic
     fun onCreate(launcher: LawnchairLauncher) {
         val recentsModel = RecentsModel.INSTANCE.get(launcher)
+        val rowHeightPx = (56 * launcher.resources.displayMetrics.density).toInt()
 
-        // The bar lives in the DragLayer (outside the paged Workspace), so it persists across
-        // every home-screen page for free. Guard creation so a failure can never crash the home.
+        // Both rows live in the DragLayer (outside the paged Workspace), so they persist across
+        // every home-screen page for free. The recents bar pins to the very bottom; the optional
+        // second pinned row sits directly above it. Guard creation so a failure can't crash home.
         val recentsBar = try {
-            LiveRecentsBar(launcher).also { attachToDragLayer(launcher, it) }
+            LiveRecentsBar(launcher).also { attachBottomRow(launcher, it, rowHeightPx, bottomMarginPx = 0) }
         } catch (e: Exception) {
             Log.w(TAG, "could not attach live recents bar", e)
             null
+        }
+
+        try {
+            SecondHotseatRow(launcher).also {
+                attachBottomRow(launcher, it, rowHeightPx, bottomMarginPx = rowHeightPx)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "could not attach second hotseat row", e)
         }
 
         // Only listen while the launcher is actually visible: registering for the whole
@@ -63,15 +73,14 @@ object LunchHeirHome {
         Log.d(TAG, "Lunch Heir home extensions initialized")
     }
 
-    private fun attachToDragLayer(launcher: LawnchairLauncher, bar: View) {
-        // Pin to the very bottom. Fine-tuning against the hotseat and gesture-nav insets is a
-        // follow-up; for now this proves the integration end to end.
-        val height = (56 * launcher.resources.displayMetrics.density).toInt()
+    private fun attachBottomRow(launcher: LawnchairLauncher, row: View, heightPx: Int, bottomMarginPx: Int) {
+        // Stack rows up from the bottom. Fine-tuning against the hotseat and gesture-nav insets is
+        // a follow-up; for now this proves the integration end to end.
         val lp = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
-            height,
+            heightPx,
             Gravity.BOTTOM,
-        )
-        launcher.dragLayer.addView(bar, lp)
+        ).apply { bottomMargin = bottomMarginPx }
+        launcher.dragLayer.addView(row, lp)
     }
 }
