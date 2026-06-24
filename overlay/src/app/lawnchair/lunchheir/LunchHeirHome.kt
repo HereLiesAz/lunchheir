@@ -27,51 +27,64 @@ object LunchHeirHome {
 
     @JvmStatic
     fun onCreate(launcher: LawnchairLauncher) {
-        val recentsModel = RecentsModel.INSTANCE.get(launcher)
         val rowHeightPx = (56 * launcher.resources.displayMetrics.density).toInt()
 
-        // Both rows live in the DragLayer (outside the paged Workspace), so they persist across
-        // every home-screen page for free. The recents bar pins to the very bottom; the optional
-        // second pinned row sits directly above it. Guard creation so a failure can't crash home.
+        // Each feature gates on its own toggle. With all of them off, nothing below is attached and
+        // the user is left with plain Lawnchair (there is no master switch by design).
+        if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.LIVE_RECENTS_BAR)) {
+            setupLiveRecentsBar(launcher, rowHeightPx)
+        }
+
+        if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.SECOND_ROW)) {
+            try {
+                SecondHotseatRow(launcher).also {
+                    attachBottomRow(launcher, it, rowHeightPx, bottomMarginPx = rowHeightPx)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "could not attach second hotseat row", e)
+            }
+        }
+
+        if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.HAX_MENU)) {
+            // The Hax menu button: tap to summon the AzNavRail-based menu. Bottom-start corner,
+            // above the two rows.
+            try {
+                val menuButton = TextView(launcher).apply {
+                    text = "≡"
+                    textSize = 28f
+                    val pad = (12 * launcher.resources.displayMetrics.density).toInt()
+                    setPadding(pad, pad, pad, pad)
+                    setOnClickListener { HaxShell.show(launcher) }
+                }
+                val lp = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM or Gravity.START,
+                ).apply { bottomMargin = rowHeightPx * 2 }
+                launcher.dragLayer.addView(menuButton, lp)
+            } catch (e: Exception) {
+                Log.w(TAG, "could not attach hax menu button", e)
+            }
+        }
+
+        Log.d(TAG, "Lunch Heir home extensions initialized")
+    }
+
+    private fun setupLiveRecentsBar(launcher: LawnchairLauncher, rowHeightPx: Int) {
+        // The bar lives in the DragLayer (outside the paged Workspace), so it persists across every
+        // home page for free. Guard creation so a failure can't crash home.
         val recentsBar = try {
             LiveRecentsBar(launcher).also { attachBottomRow(launcher, it, rowHeightPx, bottomMarginPx = 0) }
         } catch (e: Exception) {
             Log.w(TAG, "could not attach live recents bar", e)
-            null
+            return
         }
-
-        try {
-            SecondHotseatRow(launcher).also {
-                attachBottomRow(launcher, it, rowHeightPx, bottomMarginPx = rowHeightPx)
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "could not attach second hotseat row", e)
-        }
-
-        // The Hax menu button: tap to summon the AzNavRail-based menu. Sits in the bottom-start
-        // corner, above the two rows.
-        try {
-            val menuButton = TextView(launcher).apply {
-                text = "≡"
-                textSize = 28f
-                val pad = (12 * launcher.resources.displayMetrics.density).toInt()
-                setPadding(pad, pad, pad, pad)
-                setOnClickListener { HaxShell.show(launcher) }
-            }
-            val lp = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM or Gravity.START,
-            ).apply { bottomMargin = rowHeightPx * 2 }
-            launcher.dragLayer.addView(menuButton, lp)
-        } catch (e: Exception) {
-            Log.w(TAG, "could not attach hax menu button", e)
-        }
+        val recentsModel = RecentsModel.INSTANCE.get(launcher)
 
         // Only listen while the launcher is actually visible: registering for the whole
         // create..destroy span keeps firing getTasks() binder IPC in the background (wasting
-        // CPU/battery). Bind register/unregister to start/stop, and query once on start so the
-        // bar is up to date when the user returns home. QuickStep calls back on the UI thread.
+        // CPU/battery). Bind register/unregister to start/stop, and query once on start so the bar
+        // is up to date when the user returns home. QuickStep calls back on the UI thread.
         launcher.lifecycle.addObserver(object : DefaultLifecycleObserver {
             private val listener = RecentsModel.RecentTasksChangedListener { queryTasks() }
 
@@ -85,13 +98,9 @@ object LunchHeirHome {
             }
 
             private fun queryTasks() {
-                recentsModel.getTasks { tasks ->
-                    recentsBar?.setTasks(tasks)
-                }
+                recentsModel.getTasks { tasks -> recentsBar.setTasks(tasks) }
             }
         })
-
-        Log.d(TAG, "Lunch Heir home extensions initialized")
     }
 
     private fun attachBottomRow(launcher: LawnchairLauncher, row: View, heightPx: Int, bottomMarginPx: Int) {
