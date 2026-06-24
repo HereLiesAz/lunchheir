@@ -19,6 +19,15 @@ object LunchHeirPrefs {
         LIVE_RECENTS_BAR("live_recents_bar", true),
         SECOND_ROW("second_row", true),
         HAX_MENU("hax_menu", true),
+        GROUPS("groups", true),
+
+        // New visual surface; defaults off so it can't overlap the default home until its placement
+        // is tuned on-device. Opt-in via setEnabled / the (forthcoming) settings surface.
+        LIVE_PANEL("live_panel", false),
+
+        // Nested folders (folder-in-folder). Off by default: with it off the loader seam is a no-op
+        // and folder loading is identical to upstream. Opt-in until the in-folder UI lands.
+        NESTED_FOLDERS("nested_folders", false),
         ;
     }
 

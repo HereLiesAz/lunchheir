@@ -39,6 +39,20 @@ Everything else (GroupInfo, GroupView, the Room table, auto-place logic) is new 
 3. **Edit** — drag the group as a unit; drag children in/out; reorder; persist.
 4. **Auto-accept** — new installs land in a Group with free space.
 
+## Creating a group (decided: **promote a folder**)
+A group is created by converting an existing Lawnchair folder — reuse folder creation, then add a
+**"Convert to group"** action to the folder's options menu. Two parts:
+- `GroupPromotion.promote(launcher, folder)` (overlay) — the model surgery via `ModelWriter`: create
+  a group row in the folder's cell sized to its children, reparent each child into the group with
+  relative cells, delete the empty folder row, force a model reload. Touches only `ModelWriter`
+  (no loader internals) → additive/rebase-safe.
+- The menu entry — a one-line `apply_overlay.py` seam: long-pressing an open folder's label calls
+  `GroupPromotion.onFolderLabelLongPress`, which offers **Smart group** / **Plain group** / Cancel.
+- **Smart group** runs `SmartGroupSeeder.fill` after the conversion: the group's apps seed
+  `SmartFill.suggest`, matching installed apps are minted as workspace items (`AppInfo.makeWorkspaceItem`)
+  and added, the group is resized to fit, and the suggested title applied — all off the main thread,
+  then one model reload. (Continuous re-evaluation on later installs/edits is the next step.)
+
 ## Smart auto-fill (AI) — "Smart Group / Smart Folder"
 Applies to **both folders and groups**. The title and the app set are **mutually- and
 self-informing**, and re-evaluated **continuously** (not one-shot) as the group's state changes:
@@ -74,7 +88,12 @@ state (seed, then new installs, then user edits, then re-evaluation).
    nowhere yet → changes no behavior.
 2. **Adapter** — build `AppSignals` from Lawnchair's app/model data; run `converge()` continuously
    (on install/uninstall and on membership/title edits) for a Smart Group/Folder.
-3. **Remote refiner** — optional `SmartFillRemote` behind the consent toggle + key, built on a
-   pluggable `AiProvider` so any AI backend works (OpenAI-compatible default, Anthropic, custom).
+3. **Remote refiner** — optional `SmartFillRemote` behind the consent flag + key (`SmartFillConfig`),
+   built on the pluggable `AiProvider` so any AI backend works (OpenAI-compatible default, Anthropic,
+   custom). Dependency-free (`HttpURLConnection` + `org.json`); refines the on-device baseline and
+   falls back to it silently on any error. `SmartFill.suggest` runs baseline → optional refine.
+
+Remaining to make it user-visible: a Smart-group/folder create + settings surface that supplies the
+seeds/title, stores the provider config, and runs `SmartFill.suggest` continuously (on install/edit).
 
 Build after the Group container exists (it does — increment 2 merged).

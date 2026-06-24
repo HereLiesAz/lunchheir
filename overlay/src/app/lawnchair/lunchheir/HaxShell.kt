@@ -61,6 +61,10 @@ object HaxShell {
                     sheet.close(true)
                     HaxSystem.show(launcher)
                 },
+                onTweaks = {
+                    sheet.close(true)
+                    LunchHeirSettings.show(launcher)
+                },
             )
         }
     }
@@ -72,6 +76,7 @@ fun HaxMenu(
     onSearch: () -> Unit,
     onSettings: () -> Unit,
     onSystem: () -> Unit,
+    onTweaks: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -83,6 +88,7 @@ fun HaxMenu(
         HaxEntry(text = "SEARCH", onClick = onSearch)
         HaxEntry(text = "SETTINGS", onClick = onSettings)
         HaxEntry(text = "SYSTEM", onClick = onSystem)
+        HaxEntry(text = "TWEAKS", onClick = onTweaks)
     }
 }
 

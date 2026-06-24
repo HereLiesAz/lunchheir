@@ -67,6 +67,40 @@ object LunchHeirHome {
             }
         }
 
+        if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.LIVE_PANEL)) {
+            // The Live Panel: a flat monotone kinetic clock/status slab, top-start, clear of the
+            // bottom rows and menu button. Placement is intentionally simple pending on-device tuning.
+            try {
+                val panel = LivePanelView(launcher)
+                val margin = (24 * launcher.resources.displayMetrics.density).toInt()
+                val lp = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP or Gravity.START,
+                ).apply {
+                    topMargin = margin
+                    marginStart = margin
+                }
+                launcher.dragLayer.addView(panel, lp)
+            } catch (e: Exception) {
+                Log.w(TAG, "could not attach live panel", e)
+            }
+        }
+
+        if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.GROUPS)) {
+            // Keep smart groups absorbing newly installed apps. Bound to start/stop so the
+            // LauncherApps callback is only registered while home is active.
+            try {
+                val monitor = app.lawnchair.lunchheir.group.GroupAppMonitor(launcher)
+                launcher.lifecycle.addObserver(object : DefaultLifecycleObserver {
+                    override fun onStart(owner: LifecycleOwner) = monitor.start()
+                    override fun onStop(owner: LifecycleOwner) = monitor.stop()
+                })
+            } catch (e: Exception) {
+                Log.w(TAG, "could not start group app monitor", e)
+            }
+        }
+
         Log.d(TAG, "Lunch Heir home extensions initialized")
     }
 

@@ -55,7 +55,7 @@ class SmartFillEngine(private val config: Config = Config()) {
      * pattern implied by [members] + [title]. Returns only candidates at or above the threshold,
      * best first. A pass with no members and no title returns nothing — there's no pattern yet.
      */
-    fun evaluate(members: List<AppSignals>, candidates: List<AppSignals>, title: String?): List<Match> {
+    fun evaluate(members: Collection<AppSignals>, candidates: Collection<AppSignals>, title: String?): List<Match> {
         if (members.isEmpty() && title.isNullOrBlank()) return emptyList()
 
         val n = members.size.coerceAtLeast(1)
@@ -66,6 +66,18 @@ class SmartFillEngine(private val config: Config = Config()) {
         val titleTokens = tokenize(title)
         val memberLabelTokens = members.flatMap { tokenize(it.label) }
             .groupingBy { it }.eachCount()
+
+        // Normalize by the weight of the signals that are even *applicable* in this context, so a
+        // strong match on the few active signals can cross the threshold. Without this, seeding a
+        // group from only a title (no members yet) caps every score at titleWeight (0.20) < the
+        // 0.35 threshold and the title->apps flow could never admit anything. With all signals
+        // active this is a no-op (the weights sum to 1.0).
+        val activeWeights =
+            (if (categoryCounts.isNotEmpty()) config.categoryWeight else 0.0) +
+                (if (installerCounts.isNotEmpty()) config.installerWeight else 0.0) +
+                (if (titleTokens.isNotEmpty()) config.titleWeight else 0.0) +
+                (if (memberLabelTokens.isNotEmpty()) config.labelWeight else 0.0)
+        val scale = if (activeWeights > 0.0) 1.0 / activeWeights else 1.0
 
         return candidates.mapNotNull { app ->
             var score = 0.0
@@ -113,7 +125,7 @@ class SmartFillEngine(private val config: Config = Config()) {
      * across "Adobe Acrobat" / "Adobe Lightroom"), else null. The caller decides whether to apply
      * it or keep a user-set title — a user title is treated as a steering hint, not overwritten.
      */
-    fun suggestTitle(members: List<AppSignals>): String? {
+    fun suggestTitle(members: Collection<AppSignals>): String? {
         if (members.isEmpty()) return null
 
         val categoryCounts = members.filter { it.category != ApplicationInfo.CATEGORY_UNDEFINED }
@@ -124,7 +136,7 @@ class SmartFillEngine(private val config: Config = Config()) {
 
         val tokenInMembers = HashMap<String, Int>()
         for (m in members) {
-            for (t in tokenize(m.label).toSet()) tokenInMembers[t] = (tokenInMembers[t] ?: 0) + 1
+            for (t in tokenize(m.label)) tokenInMembers[t] = (tokenInMembers[t] ?: 0) + 1
         }
         tokenInMembers.entries
             .filter { it.value * 2 > members.size && it.key.length >= 3 }
@@ -153,8 +165,8 @@ class SmartFillEngine(private val config: Config = Config()) {
 
         var iterations = 0
         while (iterations++ < config.maxIterations && pool.isNotEmpty()) {
-            val workingTitle = userTitle ?: suggestTitle(members.values.toList())
-            val matches = evaluate(members.values.toList(), pool.values.toList(), workingTitle)
+            val workingTitle = userTitle ?: suggestTitle(members.values)
+            val matches = evaluate(members.values, pool.values, workingTitle)
             if (matches.isEmpty()) break
             for (m in matches) {
                 members[m.app.key] = m.app
@@ -163,7 +175,7 @@ class SmartFillEngine(private val config: Config = Config()) {
             }
         }
 
-        val finalSuggestion = userTitle ?: suggestTitle(members.values.toList())
+        val finalSuggestion = userTitle ?: suggestTitle(members.values)
         return Result(members.values.toList(), finalSuggestion, admitted)
     }
 

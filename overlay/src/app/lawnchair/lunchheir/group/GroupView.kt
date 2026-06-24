@@ -5,33 +5,66 @@ import android.graphics.Color
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.GridLayout
+import android.widget.ImageView
 import android.widget.TextView
 
 /**
- * The inline view for a [GroupInfo] on the workspace. The bind path positions it across the
- * group's cells (its span), like a widget.
+ * The inline view for a [GroupInfo] on the workspace. The bind path positions it across the group's
+ * cells (its span), like a widget — and, unlike a folder, it never collapses: its children render
+ * inline here.
  *
- * Increment 2 renders a minimal labelled placeholder so the load -> inflate -> bind pipeline for
- * groups can be proven end to end. Laying out the group's child app icons in its internal grid
- * is the next increment.
+ * Increment 3 lays the group's child app icons out in an internal grid (columns following the
+ * group's [GroupInfo.spanX]), drawing each from its loaded [com.android.launcher3.icons.BitmapInfo]
+ * — no coupling to the Launcher3 loader, so it stays additive/dormant. A header label shows the
+ * group's title; when the group is empty it falls back to a centered placeholder. Drag/edit and
+ * auto-accept are later increments.
  */
 class GroupView(context: Context) : FrameLayout(context) {
+
+    private val density = resources.displayMetrics.density
+    private val iconSizePx = (48 * density).toInt()
+    private val iconPadPx = (4 * density).toInt()
 
     private val label = TextView(context).apply {
         gravity = Gravity.CENTER
         setTextColor(Color.WHITE)
     }
+    private val grid = GridLayout(context)
 
     init {
-        // Semi-transparent scrim so the placeholder label is visible on light wallpapers/themes.
+        // Semi-transparent scrim so icons/label read on light wallpapers/themes.
         setBackgroundColor(0x44000000)
         addView(label, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        addView(grid, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
     fun bind(info: GroupInfo) {
         tag = info
-        // Real groups carry a user/AI title; "Group" is only a dormant-placeholder fallback. It
-        // moves to a string resource when the feature becomes user-visible.
+
+        val apps = info.getAppContents()
+        grid.removeAllViews()
+        grid.columnCount = info.spanX.coerceAtLeast(1)
+
+        for (item in apps) {
+            val icon = ImageView(context).apply {
+                setPadding(iconPadPx, iconPadPx, iconPadPx, iconPadPx)
+                layoutParams = GridLayout.LayoutParams().apply {
+                    width = iconSizePx
+                    height = iconSizePx
+                }
+                contentDescription = item.title
+                // Draw straight from the loaded bitmap; no icon-cache round-trip needed here.
+                item.bitmap?.let { setImageDrawable(it.newIcon(context)) }
+                setOnClickListener { item.intent?.let { intent -> context.startActivity(intent) } }
+            }
+            grid.addView(icon)
+        }
+
+        // The label is a fallback only: title header when empty/untitled, hidden once icons show.
+        val empty = apps.isEmpty()
+        label.visibility = if (empty) VISIBLE else GONE
+        grid.visibility = if (empty) GONE else VISIBLE
         label.text = info.title ?: "Group"
     }
 
