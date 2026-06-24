@@ -29,6 +29,10 @@ class GroupInfo : CollectionInfo() {
         contents.add(item)
     }
 
+    // Returns the live backing list, deliberately, to match FolderInfo/CollectionInfo: Launcher3's
+    // loader and WorkspaceItemProcessor mutate a collection's contents *through* getContents()
+    // (e.g. `collection.getContents().forEach(...)`, removal on drag-out), so an unmodifiable view
+    // would break that contract. add() still enforces willAcceptItemType for our own call sites.
     override fun getContents(): List<ItemInfo> = contents
 
     override fun getAppContents(): List<WorkspaceItemInfo> {

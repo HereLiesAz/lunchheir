@@ -9,8 +9,9 @@ installs (insecure/dumb on purpose — you remove what you don't want).
 
 ## Data model
 - New `GroupInfo extends CollectionInfo` (mirrors `FolderInfo`, minus the collapse/icon-preview).
-- New container id `CONTAINER_GROUP` and item type `ITEM_TYPE_GROUP` (Lunch Heir reserves a range
-  well clear of upstream's, e.g. containers `-120..-129`, item types `20..29`).
+- New container id `CONTAINER_GROUP = -201` (upstream reserves the `EXTENDED_CONTAINERS` region
+  ≤ -200 for non-AOSP variants) and item type `ITEM_TYPE_GROUP = 100` (well clear of upstream's
+  0..11) — chosen to survive upstream additions.
 - The **group row** is a normal Favorites desktop row: `itemType=ITEM_TYPE_GROUP`,
   `container=DESKTOP`, `screen/cellX/cellY` = position, `spanX/spanY` = cells it occupies.
 - **Children** are normal rows with `container = <group row id>` and `cellX/cellY` *relative* to
