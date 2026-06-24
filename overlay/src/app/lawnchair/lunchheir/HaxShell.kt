@@ -50,8 +50,8 @@ object HaxShell {
                     launcher.startActivity(PreferenceActivity.createIntent(launcher, Root))
                 },
                 onSystem = {
-                    // Live Panel toggles land in the next increment.
                     sheet.close(true)
+                    HaxSystem.show(launcher)
                 },
             )
         }
@@ -84,7 +84,7 @@ private val HaxInk = Color(0xFF121212)
 private val HaxPaper = Color(0xFFF4F4F4)
 
 @Composable
-private fun HaxEntry(text: String, onClick: () -> Unit) {
+internal fun HaxEntry(text: String, onClick: () -> Unit) {
     AzButton(
         onClick = onClick,
         text = text,
