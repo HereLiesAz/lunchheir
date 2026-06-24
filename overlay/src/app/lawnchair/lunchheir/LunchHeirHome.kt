@@ -4,6 +4,7 @@ import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import app.lawnchair.LawnchairLauncher
@@ -45,6 +46,26 @@ object LunchHeirHome {
             }
         } catch (e: Exception) {
             Log.w(TAG, "could not attach second hotseat row", e)
+        }
+
+        // The Hax menu button: tap to summon the AzNavRail-based menu. Sits in the bottom-start
+        // corner, above the two rows.
+        try {
+            val menuButton = TextView(launcher).apply {
+                text = "≡"
+                textSize = 28f
+                val pad = (12 * launcher.resources.displayMetrics.density).toInt()
+                setPadding(pad, pad, pad, pad)
+                setOnClickListener { HaxShell.show(launcher) }
+            }
+            val lp = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.START,
+            ).apply { bottomMargin = rowHeightPx * 2 }
+            launcher.dragLayer.addView(menuButton, lp)
+        } catch (e: Exception) {
+            Log.w(TAG, "could not attach hax menu button", e)
         }
 
         // Only listen while the launcher is actually visible: registering for the whole
