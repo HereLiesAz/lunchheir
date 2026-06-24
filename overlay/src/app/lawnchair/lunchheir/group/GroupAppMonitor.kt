@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.lifecycle.lifecycleScope
 import app.lawnchair.LawnchairLauncher
+import com.android.launcher3.model.data.AppInfo
 import kotlinx.coroutines.launch
 
 /**
@@ -28,7 +29,7 @@ class GroupAppMonitor(private val launcher: LawnchairLauncher) {
     private val registry = SmartGroupRegistry(launcher)
 
     private val callback = object : LauncherApps.Callback() {
-        override fun onPackageAdded(packageName: String, user: UserHandle) = reevaluate()
+        override fun onPackageAdded(packageName: String, user: UserHandle) = onInstalled(packageName, user)
         override fun onPackageRemoved(packageName: String, user: UserHandle) {}
         override fun onPackageChanged(packageName: String, user: UserHandle) {}
         override fun onPackagesAvailable(names: Array<out String>, user: UserHandle, replacing: Boolean) {}
@@ -43,25 +44,52 @@ class GroupAppMonitor(private val launcher: LawnchairLauncher) {
         launcherApps?.unregisterCallback(callback)
     }
 
-    private fun reevaluate() {
-        if (registry.isEmpty()) return
+    /**
+     * On a new install: re-seed every smart group (pattern match), and let the first plain group
+     * with free space catch the new app (the dumb auto-accept). One reload covers both.
+     */
+    private fun onInstalled(packageName: String, user: UserHandle) {
         val groups = ArrayList<GroupInfo>()
-        collectSmartGroups(launcher.dragLayer, groups)
+        collectGroups(launcher.dragLayer, groups)
         if (groups.isEmpty()) return
 
         launcher.lifecycleScope.launch {
-            for (group in groups) SmartGroupSeeder.fill(launcher, group)
-            launcher.model.forceReload()
+            var changed = false
+            for (group in groups) {
+                if (registry.isSmart(group.id)) {
+                    SmartGroupSeeder.fill(launcher, group)
+                    changed = true
+                }
+            }
+            // Dumb auto-accept: the first plain group with a free cell absorbs the new app.
+            val plain = groups.firstOrNull {
+                !registry.isSmart(it.id) && it.getContents().size < it.spanX * it.spanY
+            }
+            if (plain != null && addApp(plain, packageName, user)) changed = true
+
+            if (changed) launcher.model.forceReload()
         }
     }
 
-    private fun collectSmartGroups(view: View, out: MutableList<GroupInfo>) {
+    /** Mint a workspace item for [packageName] and add it to [group]; false if absent / already in. */
+    private fun addApp(group: GroupInfo, packageName: String, user: UserHandle): Boolean {
+        if (group.getAppContents().any { it.targetComponent?.packageName == packageName }) return false
+        val activity = launcherApps?.getActivityList(packageName, user)?.firstOrNull() ?: return false
+        val item = AppInfo(launcher, activity, user).makeWorkspaceItem(launcher)
+        val cols = group.spanX.coerceAtLeast(1)
+        val idx = group.getContents().size
+        launcher.modelWriter.addItemToDatabase(item, group.id, 0, idx % cols, idx / cols)
+        group.add(item)
+        return true
+    }
+
+    private fun collectGroups(view: View, out: MutableList<GroupInfo>) {
         if (view is GroupView) {
-            (view.tag as? GroupInfo)?.let { if (registry.isSmart(it.id)) out.add(it) }
+            (view.tag as? GroupInfo)?.let { out.add(it) }
             return
         }
         if (view is ViewGroup) {
-            for (i in 0 until view.childCount) collectSmartGroups(view.getChildAt(i), out)
+            for (i in 0 until view.childCount) collectGroups(view.getChildAt(i), out)
         }
     }
 }
