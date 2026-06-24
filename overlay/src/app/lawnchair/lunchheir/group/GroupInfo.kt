@@ -36,7 +36,7 @@ class GroupInfo : CollectionInfo() {
         for (item in contents) {
             when (item) {
                 is WorkspaceItemInfo -> result.add(item)
-                is AppPairInfo -> result.addAll(item.appContents)
+                is AppPairInfo -> result.addAll(item.getAppContents())
             }
         }
         return result
