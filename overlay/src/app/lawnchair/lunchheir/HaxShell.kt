@@ -5,9 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.lawnchair.LawnchairLauncher
 import app.lawnchair.ui.preferences.PreferenceActivity
 import app.lawnchair.ui.preferences.navigation.Root
@@ -73,11 +77,29 @@ fun HaxMenu(
     }
 }
 
+// Flat monotone: ink on paper. Kept local to the menu for now; a global Lunch Heir monochrome
+// theme is a separate step.
+private val HaxInk = Color(0xFF121212)
+private val HaxPaper = Color(0xFFF4F4F4)
+
 @Composable
 private fun HaxEntry(text: String, onClick: () -> Unit) {
     AzButton(
         onClick = onClick,
         text = text,
         modifier = Modifier.fillMaxWidth(),
+        color = HaxInk,
+        textColor = HaxPaper,
+        fillColor = HaxInk,
+        // Kinetic, typography-forward sections: big, heavy, wide-tracked words.
+        itemContent = {
+            Text(
+                text = text,
+                color = HaxPaper,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 3.sp,
+            )
+        },
     )
 }
