@@ -23,11 +23,15 @@ class GroupView(context: Context) : FrameLayout(context) {
     }
 
     init {
+        // Semi-transparent scrim so the placeholder label is visible on light wallpapers/themes.
+        setBackgroundColor(0x44000000)
         addView(label, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
     fun bind(info: GroupInfo) {
         tag = info
+        // Real groups carry a user/AI title; "Group" is only a dormant-placeholder fallback. It
+        // moves to a string resource when the feature becomes user-visible.
         label.text = info.title ?: "Group"
     }
 
