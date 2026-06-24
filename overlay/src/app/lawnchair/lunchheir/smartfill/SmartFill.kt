@@ -22,6 +22,14 @@ object SmartFill {
      * Suggest a membership + title for a collection from its current [seeds] and an optional
      * user-set [title], scoring against everything installed. A user title steers but is preserved.
      */
+    /**
+     * Suggest a membership + title for a collection from its current [seeds] and an optional
+     * user-set [title], scoring against everything installed. A user title steers but is preserved.
+     *
+     * Always computes the on-device baseline first. If the user has consented to a cloud refiner and
+     * configured a provider ([SmartFillConfig]), it then asks that backend to refine the result and
+     * uses it when it succeeds; on any failure it silently keeps the on-device baseline.
+     */
     suspend fun suggest(
         context: Context,
         seeds: List<AppSignals>,
@@ -30,6 +38,10 @@ object SmartFill {
     ): SmartFillEngine.Result = withContext(Dispatchers.IO) {
         // IO dispatcher: all() makes per-app binder IPC; the converge() scoring is light CPU on top.
         val candidates = InstalledAppsSource(context).all()
-        engine.converge(seeds, candidates, title)
+        val baseline = engine.converge(seeds, candidates, title)
+
+        val provider = SmartFillConfig(context).provider()
+            ?: return@withContext baseline
+        SmartFillRemote(provider).refine(seeds, candidates, title) ?: baseline
     }
 }

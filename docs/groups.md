@@ -74,7 +74,12 @@ state (seed, then new installs, then user edits, then re-evaluation).
    nowhere yet → changes no behavior.
 2. **Adapter** — build `AppSignals` from Lawnchair's app/model data; run `converge()` continuously
    (on install/uninstall and on membership/title edits) for a Smart Group/Folder.
-3. **Remote refiner** — optional `SmartFillRemote` behind the consent toggle + key, built on a
-   pluggable `AiProvider` so any AI backend works (OpenAI-compatible default, Anthropic, custom).
+3. **Remote refiner** — optional `SmartFillRemote` behind the consent flag + key (`SmartFillConfig`),
+   built on the pluggable `AiProvider` so any AI backend works (OpenAI-compatible default, Anthropic,
+   custom). Dependency-free (`HttpURLConnection` + `org.json`); refines the on-device baseline and
+   falls back to it silently on any error. `SmartFill.suggest` runs baseline → optional refine.
+
+Remaining to make it user-visible: a Smart-group/folder create + settings surface that supplies the
+seeds/title, stores the provider config, and runs `SmartFill.suggest` continuously (on install/edit).
 
 Build after the Group container exists (it does — increment 2 merged).
