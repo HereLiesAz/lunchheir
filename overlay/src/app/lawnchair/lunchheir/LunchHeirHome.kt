@@ -67,6 +67,26 @@ object LunchHeirHome {
             }
         }
 
+        if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.LIVE_PANEL)) {
+            // The Live Panel: a flat monotone kinetic clock/status slab, top-start, clear of the
+            // bottom rows and menu button. Placement is intentionally simple pending on-device tuning.
+            try {
+                val panel = LivePanelView(launcher)
+                val margin = (24 * launcher.resources.displayMetrics.density).toInt()
+                val lp = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP or Gravity.START,
+                ).apply {
+                    topMargin = margin
+                    marginStart = margin
+                }
+                launcher.dragLayer.addView(panel, lp)
+            } catch (e: Exception) {
+                Log.w(TAG, "could not attach live panel", e)
+            }
+        }
+
         Log.d(TAG, "Lunch Heir home extensions initialized")
     }
 
