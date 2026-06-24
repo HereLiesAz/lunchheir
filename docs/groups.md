@@ -39,6 +39,16 @@ Everything else (GroupInfo, GroupView, the Room table, auto-place logic) is new 
 3. **Edit** — drag the group as a unit; drag children in/out; reorder; persist.
 4. **Auto-accept** — new installs land in a Group with free space.
 
+## Creating a group (decided: **promote a folder**)
+A group is created by converting an existing Lawnchair folder — reuse folder creation, then add a
+**"Convert to group"** action to the folder's options menu. Two parts:
+- `GroupPromotion.promote(launcher, folder)` (overlay) — the model surgery via `ModelWriter`: create
+  a group row in the folder's cell sized to its children, reparent each child into the group with
+  relative cells, delete the empty folder row, force a model reload. Touches only `ModelWriter`
+  (no loader internals) → additive/rebase-safe.
+- The menu entry — one tracked `apply_overlay.py` seam into the folder options UI that calls
+  `promote(...)`. (Pending: written against the real folder-options source.)
+
 ## Smart auto-fill (AI) — "Smart Group / Smart Folder"
 Applies to **both folders and groups**. The title and the app set are **mutually- and
 self-informing**, and re-evaluated **continuously** (not one-shot) as the group's state changes:
