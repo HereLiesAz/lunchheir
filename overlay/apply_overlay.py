@@ -259,6 +259,31 @@ def main():
         applied_marker="app.lawnchair.lunchheir.group.GroupView",
     )
 
+    # ── Groups: create by promoting a folder ────────────────────────────────────
+    # Long-press an open folder's label to convert it into a Lunch Heir group. One line into the
+    # folder label setup; all logic lives in the overlay (GroupPromotion), gated by the GROUPS
+    # toggle. mInfo is the folder's FolderInfo; getContext() is the launcher (Folder is a View).
+    folder = upstream / "src/com/android/launcher3/folder/Folder.java"
+    if not folder.is_file():
+        sys.exit(f"ERROR: expected file missing: {folder}")
+    edit_file(
+        folder,
+        edits=[
+            (
+                "        mFolderName.setOnBackKeyListener(this);\n"
+                "        mFolderName.setOnEditorActionListener(this);\n"
+                "        mFolderName.setSelectAllOnFocus(true);\n",
+                "        mFolderName.setOnBackKeyListener(this);\n"
+                "        mFolderName.setOnEditorActionListener(this);\n"
+                "        mFolderName.setSelectAllOnFocus(true);\n"
+                "        // LunchHeir: long-press the folder label to convert the folder into a group\n"
+                "        mFolderName.setOnLongClickListener(v ->\n"
+                "                app.lawnchair.lunchheir.group.GroupPromotion.onFolderLabelLongPress(getContext(), mInfo));\n",
+            ),
+        ],
+        applied_marker="GroupPromotion.onFolderLabelLongPress",
+    )
+
     # ── Apply the Lunch Heir Gradle overlay ─────────────────────────────────────
     # Append one line to the app build script so Lunch Heir branding (applicationId,
     # label) and overlay source dirs are configured in the normal config phase. This

@@ -19,6 +19,7 @@ object LunchHeirPrefs {
         LIVE_RECENTS_BAR("live_recents_bar", true),
         SECOND_ROW("second_row", true),
         HAX_MENU("hax_menu", true),
+        GROUPS("groups", true),
 
         // New visual surface; defaults off so it can't overlap the default home until its placement
         // is tuned on-device. Opt-in via setEnabled / the (forthcoming) settings surface.
