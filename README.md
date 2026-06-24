@@ -15,21 +15,21 @@ Lunch Heir is GPLv3, like Lawnchair — see `LICENSE.txt`.
 .
 ├── upstream/        git submodule -> LawnchairLauncher/lawnchair (PRISTINE, pinned)
 ├── overlay/         all Lunch Heir code & configuration (layered onto upstream)
-│   ├── lunchheir.init.gradle     Gradle init script: applicationId, label, source dirs
-│   ├── lunchheir-overlay.gradle  fallback overlay (apply-line) if the init script needs it
-│   ├── apply_overlay.py          source-level edits to the submodule (backup compatibility)
+│   ├── lunchheir-overlay.gradle  Gradle overlay: applicationId, label, overlay source dirs
+│   ├── apply_overlay.py          source-level edits to the submodule (backup, hooks, apply-line)
 │   ├── apply-overlay.sh          wrapper for apply_overlay.py
-│   └── src/                      Lunch Heir feature source (used by later phases)
-├── build-lunchheir.sh   one-shot: init submodule, apply overlay, build with the overlay
+│   └── src/                      Lunch Heir feature source (compiled into the app)
+├── build-lunchheir.sh   one-shot: init submodule, apply overlay, build
 ├── .gitmodules
 └── LICENSE.txt
 ```
 
-The build runs with **upstream as the Gradle root**; the overlay is injected via
-`--init-script`, so no upstream file is edited. The only source-level change that can't be
-expressed in Gradle (backup format) is applied to the submodule working tree at build time by
-`overlay/apply_overlay.py` — idempotent, and loud if upstream drifts. The submodule stays
-pristine in git.
+The build runs with **upstream as the Gradle root**. `overlay/apply_overlay.py` makes a small
+set of idempotent edits to the submodule working tree at build time: it appends a single
+`apply from: ".../overlay/lunchheir-overlay.gradle"` line to `upstream/build.gradle` (which
+sets the applicationId/label and attaches `overlay/src` to the app's source set), patches the
+backup format for one-directional compatibility, and adds a one-line launcher hook. The script
+is idempotent and fails loudly if upstream drifts, and the submodule stays pristine in git.
 
 ## Build
 
@@ -42,17 +42,10 @@ git submodule update --init --recursive   # fetch upstream Lawnchair + its neste
 
 ```bash
 overlay/apply-overlay.sh
-cd upstream && ./gradlew --init-script ../overlay/lunchheir.init.gradle \
-    assembleLawnWithQuickstepGithubDebug
+cd upstream && ./gradlew assembleLawnWithQuickstepGithubDebug
 ```
 
 Requires JDK 21 and the Android SDK (as upstream Lawnchair expects).
-
-> **Status:** the overlay/submodule scaffolding has not yet been built end-to-end in CI. The
-> Gradle injection (`androidComponents`/DSL timing) and the backup overlay are best-effort and
-> may need a small adjustment on the first real build. If the init script misbehaves, switch to
-> the documented fallback: append one line to `upstream/build.gradle` —
-> `apply from: "$rootDir/../overlay/lunchheir-overlay.gradle"`.
 
 ## Updating Lawnchair
 

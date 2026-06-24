@@ -1,23 +1,37 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Lunch Heir — overlay applied as a normal build script (FALLBACK mechanism)
+// Lunch Heir — overlay applied as a normal build script (PRIMARY mechanism)
 //
-// Preferred mechanism is the init script (overlay/lunchheir.init.gradle), which keeps
-// upstream 100% pristine. If the init-script DSL timing ever proves unreliable on a
-// real build, use this instead by appending ONE line to the END of upstream's
-// `build.gradle` (the only upstream edit, trivially re-applied on update):
+// overlay/apply_overlay.py appends ONE line to the end of upstream's build.gradle:
 //
 //     apply from: "$rootDir/../overlay/lunchheir-overlay.gradle"
 //
 // Running inside upstream's app build script, the `android { }` extension is directly
-// available here, so this is the most robust place to override identity.
+// available, so overriding identity and adding source dirs here happens in the normal
+// configuration phase with no init-script timing ambiguity. (An earlier init-script
+// approach applied the id/label fine but failed to attach overlay Kotlin sources to the
+// compile, which is why this is now the primary mechanism.)
 // ─────────────────────────────────────────────────────────────────────────────
 
 def lunchHeirOverlayDir = new File(rootDir, "../overlay").canonicalFile
 
 android {
+    // Attach Lunch Heir overlay sources to the app's main source set. Add to BOTH the
+    // java and kotlin source dirs: the Kotlin compile task reads the `kotlin` set, so a
+    // java-only srcDir leaves .kt files out of compilation.
     def overlaySrc = new File(lunchHeirOverlayDir, "src")
     if (overlaySrc.isDirectory()) {
-        sourceSets.named("main").configure { ss -> ss.java.srcDir(overlaySrc) }
+        sourceSets.named("main").configure { ss ->
+            ss.java.srcDir(overlaySrc)
+            ss.kotlin.srcDir(overlaySrc)
+        }
+    }
+
+    // Bundle the Lunch Heir Bridge APK as an asset if a release pipeline placed it here
+    // (overlay/bridge-dist/lunchheir-bridge.apk). LunchHeirBridge installs it on request.
+    // When absent, nothing is bundled and the installer simply no-ops.
+    def bridgeDist = new File(lunchHeirOverlayDir, "bridge-dist")
+    if (bridgeDist.isDirectory()) {
+        sourceSets.named("main").configure { ss -> ss.assets.srcDir(bridgeDist) }
     }
 
     def appIds = [

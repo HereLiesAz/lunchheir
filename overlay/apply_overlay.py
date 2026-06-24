@@ -24,6 +24,20 @@ from pathlib import Path
 Edit = tuple
 
 
+def append_once(path: Path, marker: str, text_to_append: str) -> bool:
+    """Append text to a file unless `marker` is already present. Idempotent."""
+    text = path.read_text(encoding="utf-8")
+    if marker in text:
+        print(f"  already applied: {path.name} (append)")
+        return False
+    if not text.endswith("\n"):
+        text += "\n"
+    text += text_to_append
+    path.write_text(text, encoding="utf-8")
+    print(f"  appended to: {path.name}")
+    return True
+
+
 def edit_file(path: Path, edits, applied_marker: str) -> bool:
     text = path.read_text(encoding="utf-8")
     if applied_marker in text:
@@ -97,6 +111,105 @@ def main():
             ),
         ],
         applied_marker="LUNCHHEIR_INFO_FILE_NAME",
+    )
+
+    # ── Home-screen extensions hook ─────────────────────────────────────────────
+    # A single line in LawnchairLauncher.onCreate hands control to the overlay so all
+    # Lunch Heir home logic (live recents bar, second hotseat, ...) lives in overlay/src.
+    launcher = upstream / "lawnchair/src/app/lawnchair/LawnchairLauncher.kt"
+    if not launcher.is_file():
+        sys.exit(f"ERROR: expected file missing: {launcher}")
+
+    edit_file(
+        launcher,
+        edits=[
+            (
+                "        layoutInflater.factory2 = LawnchairLayoutFactory(this)\n"
+                "        super.onCreate(savedInstanceState)\n"
+                "\n"
+                "        prefs.launcherTheme.subscribeChanges(this, ::updateTheme)\n",
+                "        layoutInflater.factory2 = LawnchairLayoutFactory(this)\n"
+                "        super.onCreate(savedInstanceState)\n"
+                "\n"
+                "        // LunchHeir: initialize home-screen extensions (live recents bar, etc.)\n"
+                "        app.lawnchair.lunchheir.LunchHeirHome.onCreate(this)\n"
+                "\n"
+                "        prefs.launcherTheme.subscribeChanges(this, ::updateTheme)\n",
+            ),
+        ],
+        applied_marker="app.lawnchair.lunchheir.LunchHeirHome",
+    )
+
+    # ── Feed bridge: register + trust the bundled Lunch Heir Bridge ─────────────
+    # Make the launcher prefer our bundled bridge for the Google Discover feed, and trust any
+    # feed provider signed with our own certificate (no hardcoded signature hash). Ship the
+    # bridge signed with the same key as the launcher and FeedBridge accepts it by signature.
+    feedbridge = upstream / "lawnchair/src/app/lawnchair/FeedBridge.kt"
+    if not feedbridge.is_file():
+        sys.exit(f"ERROR: expected file missing: {feedbridge}")
+    edit_file(
+        feedbridge,
+        edits=[
+            (
+                "    private val bridgePackages by lazy {\n"
+                "        listOf(\n"
+                '            PixelBridgeInfo("com.google.android.apps.nexuslauncher", R.integer.bridge_signature_hash),\n',
+                "    private val bridgePackages by lazy {\n"
+                "        listOf(\n"
+                "            // LunchHeir: prefer the bundled Lunch Heir Bridge (trusted by signature match)\n"
+                '            BridgeInfo("com.hereliesaz.lunchheir.bridge", 0),\n'
+                '            PixelBridgeInfo("com.google.android.apps.nexuslauncher", R.integer.bridge_signature_hash),\n',
+            ),
+            (
+                "        open fun isSigned(): Boolean {\n"
+                "            when {\n"
+                "                BuildConfig.DEBUG -> return true\n",
+                "        open fun isSigned(): Boolean {\n"
+                "            // LunchHeir: trust a feed provider signed with our own certificate (the\n"
+                "            // bundled Lunch Heir Bridge), so no signature hash needs hardcoding.\n"
+                "            if (context.packageManager.checkSignatures(context.packageName, packageName) ==\n"
+                "                PackageManager.SIGNATURE_MATCH\n"
+                "            ) {\n"
+                "                return true\n"
+                "            }\n"
+                "            when {\n"
+                "                BuildConfig.DEBUG -> return true\n",
+            ),
+        ],
+        applied_marker="com.hereliesaz.lunchheir.bridge",
+    )
+
+    # ── Manifest: permission to install the bundled bridge ──────────────────────
+    manifest = upstream / "lawnchair/AndroidManifest.xml"
+    if not manifest.is_file():
+        sys.exit(f"ERROR: expected file missing: {manifest}")
+    edit_file(
+        manifest,
+        edits=[
+            (
+                '    <uses-permission android:name="android.permission.INTERNET" />\n',
+                '    <uses-permission android:name="android.permission.INTERNET" />\n'
+                "    <!-- LunchHeir: install the bundled Lunch Heir Bridge companion -->\n"
+                '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n',
+            ),
+        ],
+        applied_marker="REQUEST_INSTALL_PACKAGES",
+    )
+
+    # ── Apply the Lunch Heir Gradle overlay ─────────────────────────────────────
+    # Append one line to the app build script so Lunch Heir branding (applicationId,
+    # label) and overlay source dirs are configured in the normal config phase. This
+    # is the primary mechanism; the build no longer needs --init-script.
+    build_gradle = upstream / "build.gradle"
+    if not build_gradle.is_file():
+        sys.exit(f"ERROR: expected file missing: {build_gradle}")
+    append_once(
+        build_gradle,
+        marker="lunchheir-overlay.gradle",
+        text_to_append=(
+            "\n// LunchHeir: apply the Lunch Heir overlay (branding + overlay source dirs)\n"
+            'apply from: "$rootDir/../overlay/lunchheir-overlay.gradle"\n'
+        ),
     )
 
     print("Done.")
