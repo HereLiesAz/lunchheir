@@ -87,6 +87,20 @@ object LunchHeirHome {
             }
         }
 
+        if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.GROUPS)) {
+            // Keep smart groups absorbing newly installed apps. Bound to start/stop so the
+            // LauncherApps callback is only registered while home is active.
+            try {
+                val monitor = app.lawnchair.lunchheir.group.GroupAppMonitor(launcher)
+                launcher.lifecycle.addObserver(object : DefaultLifecycleObserver {
+                    override fun onStart(owner: LifecycleOwner) = monitor.start()
+                    override fun onStop(owner: LifecycleOwner) = monitor.stop()
+                })
+            } catch (e: Exception) {
+                Log.w(TAG, "could not start group app monitor", e)
+            }
+        }
+
         Log.d(TAG, "Lunch Heir home extensions initialized")
     }
 

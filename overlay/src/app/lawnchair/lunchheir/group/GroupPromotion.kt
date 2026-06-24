@@ -58,6 +58,8 @@ object GroupPromotion {
     @JvmStatic
     fun promoteSmart(launcher: LawnchairLauncher, folder: FolderInfo) {
         val group = convert(launcher, folder)
+        // Mark it smart so GroupAppMonitor keeps re-seeding it as new apps are installed.
+        SmartGroupRegistry(launcher).markSmart(group.id)
         launcher.lifecycleScope.launch {
             SmartGroupSeeder.fill(launcher, group)
             launcher.model.forceReload()
