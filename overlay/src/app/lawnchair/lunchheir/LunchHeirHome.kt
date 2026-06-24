@@ -1,6 +1,9 @@
 package app.lawnchair.lunchheir
 
 import android.util.Log
+import android.view.Gravity
+import android.view.View
+import android.widget.FrameLayout
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import app.lawnchair.LawnchairLauncher
@@ -15,11 +18,8 @@ import com.android.quickstep.RecentsModel
  * lives here in the overlay and the upstream edit stays one line — keeping the fork easy
  * to rebase onto new Lawnchair releases.
  *
- * This first increment is a deliberately small "walking skeleton": it wires up the QuickStep
- * [RecentsModel] subscription that the live recents bar is built on, and ties it to the
- * launcher lifecycle. Its real purpose is to verify, on CI, that overlay source compiles and
- * links against upstream and that the patch hook fires. The bar's view + gestures land in the
- * next increment.
+ * It attaches the [LiveRecentsBar] to the DragLayer (so it persists across all home pages) and
+ * keeps it bound to the QuickStep [RecentsModel] while the launcher is visible.
  */
 object LunchHeirHome {
     private const val TAG = "LunchHeirHome"
@@ -27,6 +27,15 @@ object LunchHeirHome {
     @JvmStatic
     fun onCreate(launcher: LawnchairLauncher) {
         val recentsModel = RecentsModel.INSTANCE.get(launcher)
+
+        // The bar lives in the DragLayer (outside the paged Workspace), so it persists across
+        // every home-screen page for free. Guard creation so a failure can never crash the home.
+        val recentsBar = try {
+            LiveRecentsBar(launcher).also { attachToDragLayer(launcher, it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "could not attach live recents bar", e)
+            null
+        }
 
         // Only listen while the launcher is actually visible: registering for the whole
         // create..destroy span keeps firing getTasks() binder IPC in the background (wasting
@@ -46,11 +55,23 @@ object LunchHeirHome {
 
             private fun queryTasks() {
                 recentsModel.getTasks { tasks ->
-                    Log.d(TAG, "recent tasks changed: ${tasks.size} task group(s)")
+                    recentsBar?.setTasks(tasks)
                 }
             }
         })
 
         Log.d(TAG, "Lunch Heir home extensions initialized")
+    }
+
+    private fun attachToDragLayer(launcher: LawnchairLauncher, bar: View) {
+        // Pin to the very bottom. Fine-tuning against the hotseat and gesture-nav insets is a
+        // follow-up; for now this proves the integration end to end.
+        val height = (56 * launcher.resources.displayMetrics.density).toInt()
+        val lp = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            height,
+            Gravity.BOTTOM,
+        )
+        launcher.dragLayer.addView(bar, lp)
     }
 }
