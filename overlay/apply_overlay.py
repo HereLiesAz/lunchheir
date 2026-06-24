@@ -259,6 +259,27 @@ def main():
         applied_marker="app.lawnchair.lunchheir.group.GroupView",
     )
 
+    # ── Nested folders: allow a folder as a child of a collection (gated, opt-in) ─
+    # checkAndAddItem only attaches app/shortcut/app-pair children to their container; folders are
+    # excluded, which blocks nesting. Add ITEM_TYPE_FOLDER, gated by NestedFolders.isEnabled so the
+    # default (toggle off) is byte-for-byte upstream behavior. mContext is LoaderCursor's Context.
+    loadercursor = upstream / "src/com/android/launcher3/model/LoaderCursor.java"
+    if not loadercursor.is_file():
+        sys.exit(f"ERROR: expected file missing: {loadercursor}")
+    edit_file(
+        loadercursor,
+        edits=[
+            (
+                "                    || info.itemType == ITEM_TYPE_APPLICATION)\n",
+                "                    || info.itemType == ITEM_TYPE_APPLICATION\n"
+                "                    // LunchHeir: allow a folder inside a folder when nesting is enabled (opt-in)\n"
+                "                    || (info.itemType == com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER\n"
+                "                        && app.lawnchair.lunchheir.folder.NestedFolders.isEnabled(mContext)))\n",
+            ),
+        ],
+        applied_marker="app.lawnchair.lunchheir.folder.NestedFolders",
+    )
+
     # ── Groups: create by promoting a folder ────────────────────────────────────
     # Long-press an open folder's label to convert it into a Lunch Heir group. One line into the
     # folder label setup; all logic lives in the overlay (GroupPromotion), gated by the GROUPS
