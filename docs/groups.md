@@ -52,13 +52,29 @@ Either or both may be user-provided; the AI fills in and keeps refining whicheve
 or stale. Net: a living group whose title and contents keep re-deriving from its own evolving
 state (seed, then new installs, then user edits, then re-evaluation).
 
-### Backend (open decision — needs user input)
-- **On-device heuristics** (PackageManager `ApplicationInfo.category`, installer/developer, name
-  similarity): free, fully private; good for type/developer, weak on "purpose" and on
-  title↔apps semantic reasoning.
-- **Cloud LLM (e.g. Claude API)**: strong at purpose/semantic grouping and naming, but sends the
-  installed-app list off-device and needs an API key.
-- Likely shape: **hybrid** — on-device baseline always available; optional LLM for purpose/title
-  reasoning, behind a privacy/consent toggle. API-key sourcing TBD.
+### Backend (decided: **hybrid**)
+- **On-device heuristics** — the always-on engine. Free, fully private, offline. Scores candidate
+  apps against the current membership + title on four signals: `ApplicationInfo.category` match,
+  shared installer package (developer proxy), title-keyword overlap, and label-token similarity to
+  existing members. Drives the continuous self-reinforcing loop (members → title → more members).
+  Good for type/developer; weaker on abstract "purpose".
+- **Cloud LLM (provider-agnostic)** — an *optional* refiner, off by default, gated behind a
+  per-feature consent toggle (`LunchHeirPrefs`) **and** a user-provided API key. **Any AI backend**
+  is usable, not just Claude: the refiner is built around a pluggable `AiProvider` (configurable
+  base URL + model + key + wire format). The OpenAI-compatible chat-completions shape is the default
+  lingua franca (covers OpenAI, Gemini's compat endpoint, Groq, Together, local Ollama / LM Studio,
+  etc.); Anthropic's messages shape is a second built-in; "custom" lets the user point at any
+  endpoint. Adding a provider is configuration, not new code. When enabled it refines the
+  pattern/title for purpose-based grouping; when absent the on-device engine stands alone. It sends
+  the installed-app inventory (labels/packages/categories) off-device, hence the explicit opt-in.
 
-Build after the Group container exists.
+### Build order (each CI-green; dormant until wired)
+1. **Engine** — `SmartFillEngine` (pure Kotlin): `evaluate()` one-pass scorer + `suggestTitle()` +
+   `converge()` self-reinforcing loop. No Android coupling beyond category ints. Instantiated
+   nowhere yet → changes no behavior.
+2. **Adapter** — build `AppSignals` from Lawnchair's app/model data; run `converge()` continuously
+   (on install/uninstall and on membership/title edits) for a Smart Group/Folder.
+3. **Remote refiner** — optional `SmartFillRemote` behind the consent toggle + key, built on a
+   pluggable `AiProvider` so any AI backend works (OpenAI-compatible default, Anthropic, custom).
+
+Build after the Group container exists (it does — increment 2 merged).
