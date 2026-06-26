@@ -112,10 +112,10 @@ object LunchHeirHome {
      * AzNavRail dropdown) takes its natural width at the start; the recents bar takes the remaining
      * width. Either half can be absent depending on its toggle.
      */
-    private fun setupBottomRow(launcher: LawnchairLauncher, rowHeightPx: Int) {
+    private fun setupBottomRow(launcher: LawnchairLauncher, rowHeightPx: Int): Boolean {
         val haxEnabled = LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.HAX_MENU)
         val recentsEnabled = LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.LIVE_RECENTS_BAR)
-        if (!haxEnabled && !recentsEnabled) return
+        if (!haxEnabled && !recentsEnabled) return false
 
         val row = LinearLayout(launcher).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -151,7 +151,7 @@ object LunchHeirHome {
             }
         }
 
-        if (row.childCount == 0) return
+        if (row.childCount == 0) return false
         attachToDragLayer(
             launcher,
             row,
@@ -159,6 +159,7 @@ object LunchHeirHome {
             rowHeightPx,
             Gravity.BOTTOM,
         )
+        return true
     }
 
     /** Bind a [LiveRecentsBar] to QuickStep's [RecentsModel], listening only while home is visible. */
