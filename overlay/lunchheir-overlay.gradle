@@ -133,7 +133,9 @@ android {
                 keyPassword System.getenv("KEY_PASSWORD")
             }
         }
-        buildTypes.findByName("debug")?.signingConfig = signingConfigs.getByName("lunchheir")
+        def lhSigning = signingConfigs.getByName("lunchheir")
+        buildTypes.findByName("debug")?.signingConfig = lhSigning
+        buildTypes.findByName("release")?.signingConfig = lhSigning
     }
 }
 
