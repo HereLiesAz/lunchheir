@@ -15,10 +15,10 @@
     <string name="debug_restart_launcher">Restart Lunch Heir</string>
     <string name="major_update_description">You are about to update from Lunch Heir <xliff:g example="15" id="current_major_version">%1$s</xliff:g> to Lunch Heir <xliff:g example="16" id="next_major_version">%2$s</xliff:g>, please consider carefully as newer major version may be unstable than current version.</string>
     <string name="lawnchair_bug_report">Lunch Heir bug report</string>
-    <!-- NOTE: this one describes a revenue-share agreement that is Lawnchair's, not Lunch Heir's. The
-         literal swap below keeps "no Lawnchair text" but the claim is not factually ours — reword or
-         drop if that matters. -->
-    <string name="search_provider_sponsored_description">%1$s and Lunch Heir have a revenue share agreement.\n\nSearching with %1$s helps support Lunch Heir.</string>
+    <!-- Reworded (not a literal swap): upstream claims a Lawnchair revenue-share agreement, which is
+         not Lunch Heir's — asserting it for Lunch Heir would be false (a Play-policy / legal risk).
+         Drop the claim and just state the provider is sponsored. No "Lawnchair", no false statement. -->
+    <string name="search_provider_sponsored_description">%1$s is a sponsored search provider.</string>
     <string name="hotseat_mode_lawnchair" translatable="false">Lunch Heir</string>
     <string name="smartspace_mode_lawnchair" translatable="false">Lunch Heir</string>
 </resources>
