@@ -20,7 +20,7 @@ object NestedFolders {
     const val MAX_DEPTH = 3
 
     @Volatile
-    private var accepting = false
+    private var accepting: Boolean? = null
 
     /** Refresh the cached accept-flag from prefs. Called at launcher create. */
     @JvmStatic
@@ -30,12 +30,16 @@ object NestedFolders {
 
     /** Context-free accept check for the static `FolderInfo.willAcceptItemType` seam. */
     @JvmStatic
-    fun isAccepting(): Boolean = accepting
+    fun isAccepting(): Boolean = accepting ?: false
 
-    /** Context-backed gate for the loader seam (also refreshes the cached flag). */
+    /**
+     * Context-backed gate for the loader seam. Reads prefs only once (lazily, if [refresh] hasn't
+     * run yet) — this is called for every workspace item during loading, so it must not hit
+     * SharedPreferences each time.
+     */
     @JvmStatic
     fun isEnabled(context: Context): Boolean {
-        refresh(context)
-        return accepting
+        if (accepting == null) refresh(context)
+        return accepting ?: false
     }
 }

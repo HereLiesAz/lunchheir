@@ -273,11 +273,34 @@ def main():
                 "                || itemType == ITEM_TYPE_APP_PAIR;\n",
                 "                || itemType == ITEM_TYPE_APP_PAIR\n"
                 "                // LunchHeir: accept a folder into a folder when nesting is enabled (opt-in)\n"
-                "                || (itemType == LauncherSettings.Favorites.ITEM_TYPE_FOLDER\n"
+                "                || (itemType == com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER\n"
                 "                    && app.lawnchair.lunchheir.folder.NestedFolders.isAccepting());\n",
             ),
         ],
         applied_marker="app.lawnchair.lunchheir.folder.NestedFolders.isAccepting",
+    )
+
+    # ── Nested folders: render a sub-folder as a FolderIcon inside its parent ────
+    # FolderPagedView.createNewView casts every non-app-pair child to WorkspaceItemInfo, so a folder
+    # child would crash. Add a FolderInfo branch that inflates a real FolderIcon. Safe always-on:
+    # with nesting off no folder child exists, and handling one beats crashing.
+    folderpaged = upstream / "src/com/android/launcher3/folder/FolderPagedView.java"
+    if not folderpaged.is_file():
+        sys.exit(f"ERROR: expected file missing: {folderpaged}")
+    edit_file(
+        folderpaged,
+        edits=[
+            (
+                "                    getContext()), null , api, BubbleTextView.DISPLAY_FOLDER);\n"
+                "        } else {\n",
+                "                    getContext()), null , api, BubbleTextView.DISPLAY_FOLDER);\n"
+                "        } else if (item instanceof com.android.launcher3.model.data.FolderInfo lhFolder) {\n"
+                "            // LunchHeir: a nested folder renders as a folder icon inside its parent folder\n"
+                "            icon = FolderIcon.inflateIcon(R.layout.folder_icon, mFolder.mActivityContext, null, lhFolder);\n"
+                "        } else {\n",
+            ),
+        ],
+        applied_marker="LunchHeir: a nested folder renders as a folder icon",
     )
 
     # ── Nested folders: allow a folder as a child of a collection (gated, opt-in) ─
