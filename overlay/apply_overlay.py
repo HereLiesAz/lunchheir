@@ -237,6 +237,102 @@ def main():
         applied_marker="app.lawnchair.lunchheir.LunchHeirFeatureToggles",
     )
 
+    # ── Settings: contextual Lunch Heir toggles on their native screens ─────────
+    # Beyond the consolidated section, surface each feature toggle on the Lawnchair settings screen
+    # it naturally belongs to (a small "Lunch Heir" group at the bottom). LunchHeirFeatureTogglesFor
+    # renders only the features whose Category matches. Each is appended as the last child of that
+    # screen's PreferenceLayout lambda.
+    dock_prefs = upstream / "lawnchair/src/app/lawnchair/ui/preferences/destinations/DockPreferences.kt"
+    if not dock_prefs.is_file():
+        sys.exit(f"ERROR: expected file missing: {dock_prefs}")
+    edit_file(
+        dock_prefs,
+        edits=[
+            (
+                "                        adapter = prefs2.enableLabelInDock.getAdapter(),\n"
+                "                        label = stringResource(id = R.string.show_labels),\n"
+                "                    )\n"
+                "                }\n"
+                "            }\n"
+                "        }\n",
+                "                        adapter = prefs2.enableLabelInDock.getAdapter(),\n"
+                "                        label = stringResource(id = R.string.show_labels),\n"
+                "                    )\n"
+                "                }\n"
+                "            }\n"
+                "\n"
+                "            // LunchHeir: dock-related feature toggles, inline with the Dock settings\n"
+                "            app.lawnchair.lunchheir.LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.DOCK)\n"
+                "        }\n",
+            ),
+        ],
+        applied_marker="LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.DOCK)",
+    )
+
+    folder_prefs = upstream / "lawnchair/src/app/lawnchair/ui/preferences/destinations/FolderPreferences.kt"
+    if not folder_prefs.is_file():
+        sys.exit(f"ERROR: expected file missing: {folder_prefs}")
+    edit_file(
+        folder_prefs,
+        edits=[
+            (
+                "                    adapter = prefs2.homeIconLabelFolderSizeFactor.getAdapter(),\n"
+                "                    step = 0.1f,\n"
+                "                    valueRange = 0.5F..1.5F,\n"
+                "                    showAsPercentage = true,\n"
+                "                )\n"
+                "            }\n"
+                "        }\n"
+                "    }\n"
+                "}\n",
+                "                    adapter = prefs2.homeIconLabelFolderSizeFactor.getAdapter(),\n"
+                "                    step = 0.1f,\n"
+                "                    valueRange = 0.5F..1.5F,\n"
+                "                    showAsPercentage = true,\n"
+                "                )\n"
+                "            }\n"
+                "        }\n"
+                "\n"
+                "        // LunchHeir: folder-related feature toggles, inline with the Folder settings\n"
+                "        app.lawnchair.lunchheir.LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.FOLDERS)\n"
+                "    }\n"
+                "}\n",
+            ),
+        ],
+        applied_marker="LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.FOLDERS)",
+    )
+
+    general_prefs = upstream / "lawnchair/src/app/lawnchair/ui/preferences/destinations/GeneralPreferences.kt"
+    if not general_prefs.is_file():
+        sys.exit(f"ERROR: expected file missing: {general_prefs}")
+    edit_file(
+        general_prefs,
+        edits=[
+            (
+                "                NotificationDotColorContrastWarnings(\n"
+                "                    dotColor = dotColor,\n"
+                "                    dotTextColor = dotTextColor,\n"
+                "                )\n"
+                "            }\n"
+                "        }\n"
+                "    }\n"
+                "}\n",
+                "                NotificationDotColorContrastWarnings(\n"
+                "                    dotColor = dotColor,\n"
+                "                    dotTextColor = dotTextColor,\n"
+                "                )\n"
+                "            }\n"
+                "        }\n"
+                "\n"
+                "        // LunchHeir: general feature toggles (e.g. monochrome), inline with General settings\n"
+                "        app.lawnchair.lunchheir.LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.GENERAL)\n"
+                "    }\n"
+                "}\n",
+            ),
+        ],
+        applied_marker="LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.GENERAL)",
+    )
+
     # ── Groups: load + render (additive, dormant until a group row exists) ──────
     # Route ITEM_TYPE_GROUP rows through the folder/app-pair processor, upgrade the placeholder
     # to a GroupInfo (keeping its multi-cell span), and inflate a GroupView for it. All branches
