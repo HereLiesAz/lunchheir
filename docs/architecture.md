@@ -50,7 +50,7 @@ exactly what `update-upstream.yml` (and a local re-apply) surfaces.
 
 ### The Gradle overlay (`lunchheir-overlay.gradle`)
 
-Applied via `apply from:` into Lawnchair's `build.gradle.kts`. It is **Groovy** (not `.gradle.kts`)
+Applied via `apply from:` into Lawnchair's root `build.gradle`. It is **Groovy** (not `.gradle.kts`)
 on purpose: an applied script plugin reaches the host's `android { }`, `signingConfigs`, `licensee
 { }`, and `dependencies { }` extensions by dynamic dispatch; Kotlin DSL applied scripts get no
 type-safe accessors for those, forcing verbose `configure<…>()` with AGP-internal type imports. It:

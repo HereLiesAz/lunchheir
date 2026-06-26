@@ -30,7 +30,7 @@ All attached in `LunchHeirHome.onCreate`, in the DragLayer so they persist acros
 ## Hax shell
 
 The "Hax"-style launcher shell — flat, monotone, typography-forward — built on the **AzNavRail**
-(`com.hereliesaz:AzNavRail`) library, hosted in Lawnchair's `ComposeBottomSheet`.
+(`com.github.HereLiesAz:AzNavRail`) library, hosted in Lawnchair's `ComposeBottomSheet`.
 
 - **Menu** (`HaxShell`) — a menu button (bottom-start) summons sections: APPS, SEARCH, SETTINGS,
   SYSTEM, TWEAKS, ADD PANEL — each a kinetic AzNavRail entry wired to the real launcher action.
