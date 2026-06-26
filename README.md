@@ -27,7 +27,8 @@ Lawnchair** — there is no master switch by design.
 - **Smart auto-fill** — an on-device heuristic engine plus an optional, provider-agnostic cloud LLM
   refiner (bring your own key — OpenAI-compatible, Anthropic, or any custom endpoint).
 - **Nested folders** — a folder inside a folder (opt-in), with a cycle/depth guard.
-- **Pixel-Bridge feed** — a bundled, self-signed feed-provider companion for the Discover feed.
+- **Pixel-Bridge feed** — a separate, user-installed feed-provider companion for the Discover feed
+  (the launcher guides you to download it; it never installs it for you). Trusted by signature.
 - **One-directional backup compatibility** — reads Lawnchair backups; writes its own that stock
   Lawnchair can't read back.
 

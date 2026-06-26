@@ -85,9 +85,12 @@ Created by dragging a folder onto another folder (reuses Launcher3's drag-to-fol
 
 ## Pixel-Bridge feed
 
-`LunchHeirBridge` installs a bundled, self-signed feed-provider companion
-(`com.hereliesaz.lunchheir.bridge`) for the Google Discover feed; `FeedBridge` is patched to prefer
-and trust it by signature match (no hard-coded hash).
+The Discover feed needs a feed provider, and Google only serves it to *debuggable* apps — so the
+provider is a **separate companion app** (`com.hereliesaz.lunchheir.bridge`), not part of the release
+launcher. Lunch Heir does **not** bundle or install it (that would be hostile and a Play-policy
+risk): `LunchHeirBridge.openDownloadPage` guides the user to **download and install it themselves**
+(published by `bridge.yml` as the `bridge-latest` release, signed with the launcher's key). Once
+installed, the patched `FeedBridge` prefers and trusts it by **signature match** (no hard-coded hash).
 
 ## Backup compatibility
 

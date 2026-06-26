@@ -179,22 +179,12 @@ def main():
         applied_marker="com.hereliesaz.lunchheir.bridge",
     )
 
-    # ── Manifest: permission to install the bundled bridge ──────────────────────
+    # ── Manifest ────────────────────────────────────────────────────────────────
+    # (No REQUEST_INSTALL_PACKAGES: Lunch Heir does not install the Bridge for the user — they
+    # download and install it themselves, so the launcher needs no install permission.)
     manifest = upstream / "lawnchair/AndroidManifest.xml"
     if not manifest.is_file():
         sys.exit(f"ERROR: expected file missing: {manifest}")
-    edit_file(
-        manifest,
-        edits=[
-            (
-                '    <uses-permission android:name="android.permission.INTERNET" />\n',
-                '    <uses-permission android:name="android.permission.INTERNET" />\n'
-                "    <!-- LunchHeir: install the bundled Lunch Heir Bridge companion -->\n"
-                '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />\n',
-            ),
-        ],
-        applied_marker="REQUEST_INSTALL_PACKAGES",
-    )
 
     # ── Manifest: declare the Live Panel widget picker activity ─────────────────
     # Overlay-owned translucent activity that runs the interactive widget pick/bind/configure flow
