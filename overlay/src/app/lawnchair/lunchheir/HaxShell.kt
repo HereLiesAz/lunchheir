@@ -11,14 +11,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
@@ -55,6 +54,11 @@ object HaxShell {
     @JvmStatic
     fun createMenuView(launcher: LawnchairLauncher): View =
         ComposeView(launcher).apply {
+            // Tie the composition to the launcher's lifecycle, not window attach/detach. The
+            // DragLayer detaches/re-attaches its children during state transitions and drags; the
+            // default DisposeOnDetachedFromWindow strategy would dispose and rebuild the menu (and
+            // lose the toggle states) on every such transition.
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
             setContent {
                 MaterialTheme {
                     LunchHeirMenu(launcher)
@@ -70,12 +74,20 @@ private fun LunchHeirMenu(launcher: LawnchairLauncher) {
     // throwaway controller is all the component needs.
     val navController = rememberNavController()
 
+    // The AzDropdownMenu content block is a plain DSL scope (AzDropdownMenuScope), NOT a @Composable
+    // lambda — so Compose state must be hoisted HERE, in the composable body, and only read inside
+    // the DSL. One MutableState per feature holds the live checked value; flipping it persists the
+    // pref and (since the read happens in the menu's composition) refreshes the toggle label.
+    val features = remember { LunchHeirPrefs.Feature.values() }
+    val checkedStates = remember {
+        features.map { mutableStateOf(LunchHeirPrefs.isEnabled(launcher, it)) }
+    }
+
     AzDropdownMenu(navController = navController) {
         azConfig(
             design = AzDropdownDesign.MENU,
             dockingSide = AzDockingSide.LEFT,
             showFooter = false,
-            inAppAbout = false,
         )
 
         azItem(text = "APPS") {
@@ -100,17 +112,15 @@ private fun LunchHeirMenu(launcher: LawnchairLauncher) {
         // false so the menu stays open while the user flips several. Changes that need a relaunch to
         // take effect (e.g. surfaces attached in onCreate) are persisted immediately and apply on the
         // next launcher start.
-        for (feature in LunchHeirPrefs.Feature.values()) {
-            var checked by remember {
-                mutableStateOf(LunchHeirPrefs.isEnabled(launcher, feature))
-            }
+        features.forEachIndexed { i, feature ->
+            val checked = checkedStates[i]
             azToggle(
                 toggleOnText = "${feature.label} ✓",
                 toggleOffText = "${feature.label} ✗",
-                isChecked = checked,
+                isChecked = checked.value,
                 closeOnClick = false,
             ) { enabled ->
-                checked = enabled
+                checked.value = enabled
                 LunchHeirPrefs.setEnabled(launcher, feature, enabled)
             }
         }

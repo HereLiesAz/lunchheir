@@ -40,10 +40,13 @@ object LunchHeirHome {
         // Bottom row: the Hax menu trigger (start) and the live recents bar (filling the rest) share
         // ONE row docked to the bottom — so the menu button sits in the recents/dock area, not
         // floating at the top. Each half gates on its own toggle; with both off the row is skipped.
-        setupBottomRow(launcher, rowHeightPx)
+        val hasBottomRow = setupBottomRow(launcher, rowHeightPx)
 
         if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.SECOND_ROW)) {
             try {
+                // Sit directly above the bottom row when there is one; otherwise dock to the very
+                // bottom so there's no empty gap below the second row.
+                val secondRowMargin = if (hasBottomRow) rowHeightPx else 0
                 SecondHotseatRow(launcher).also {
                     attachToDragLayer(
                         launcher,
@@ -51,7 +54,7 @@ object LunchHeirHome {
                         InsettableFrameLayout.LayoutParams.MATCH_PARENT,
                         rowHeightPx,
                         Gravity.BOTTOM,
-                        bottomMargin = rowHeightPx,
+                        bottomMargin = secondRowMargin,
                     )
                 }
             } catch (e: Exception) {
