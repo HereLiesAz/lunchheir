@@ -280,6 +280,25 @@ def main():
         applied_marker="app.lawnchair.lunchheir.folder.NestedFolders.isAccepting",
     )
 
+    # ── Nested folders: cycle/depth guard on folder-into-folder drops ───────────
+    # FolderIcon.willAcceptItem has both the target folder (mInfo) and the dragged item, so it's the
+    # place to refuse a drop that would create a cycle (which renders forever) or nest too deep.
+    foldericon = upstream / "src/com/android/launcher3/folder/FolderIcon.java"
+    if not foldericon.is_file():
+        sys.exit(f"ERROR: expected file missing: {foldericon}")
+    edit_file(
+        foldericon,
+        edits=[
+            (
+                "        return (willAcceptItemType(item.itemType) && item != mInfo && !mFolder.isOpen());\n",
+                "        return (willAcceptItemType(item.itemType) && item != mInfo && !mFolder.isOpen()\n"
+                "                // LunchHeir: refuse folder-into-folder drops that would cycle or over-nest\n"
+                "                && app.lawnchair.lunchheir.folder.NestedFolders.canDrop(mInfo, item));\n",
+            ),
+        ],
+        applied_marker="app.lawnchair.lunchheir.folder.NestedFolders.canDrop",
+    )
+
     # ── Nested folders: render a sub-folder as a FolderIcon inside its parent ────
     # FolderPagedView.createNewView casts every non-app-pair child to WorkspaceItemInfo, so a folder
     # child would crash. Add a FolderInfo branch that inflates a real FolderIcon. Safe always-on:
