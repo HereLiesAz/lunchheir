@@ -8,8 +8,10 @@ name: Auto-update Lawnchair submodule
 # It never pushes a breaking bump to main on its own.
 
 on:
-  schedule:
-    - cron: "27 */6 * * *"   # every 6 hours (off-minute); only builds when upstream actually moved
+  # Scheduled auto-bump is PAUSED. 16-dev is a force-pushing branch: a pinned tip can be rebased
+  # away, which breaks every checkout of main — and this workflow can't self-heal because its own
+  # checkout fails first. Re-enable the schedule only once the submodule init is made resilient
+  # (fall back to the branch tip when the pin is unreachable). Until then, run it manually.
   workflow_dispatch:
 
 concurrency:
