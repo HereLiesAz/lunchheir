@@ -94,12 +94,15 @@ android {
         }
     }
 
-    // Overlay resources (icons, drawables, strings, etc.). Files here override upstream
-    // resources with the same qualified name, using Android's last-source-set-wins rule.
+    // Overlay resources (e.g. the Lunch Heir launcher icon). These must OVERRIDE upstream's
+    // same-named resources, not collide with them: two srcDirs in the SAME source set is a
+    // "Duplicate resources" error. Attach the overlay res to the build-type source sets instead —
+    // build types have higher merge priority than main and exactly one applies per variant, so a
+    // same-named resource overrides upstream's main res cleanly (no duplicate, no cross-flavor clash).
     def overlayRes = new File(lunchHeirOverlayDir, "res")
     if (overlayRes.isDirectory()) {
-        sourceSets.named("main").configure { ss ->
-            ss.res.srcDir(overlayRes)
+        ["debug", "release"].each { bt ->
+            sourceSets.findByName(bt)?.res?.srcDir(overlayRes)
         }
     }
 
