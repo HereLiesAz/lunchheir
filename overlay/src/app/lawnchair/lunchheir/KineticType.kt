@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
@@ -72,6 +73,10 @@ fun Modifier.wp7Tilt(maxTiltDegrees: Float = 10f, onClick: () -> Unit): Modifier
     val ry = remember { Animatable(0f) }
     val scale = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
+    // pointerInput(Unit) captures its block once; keep the params fresh so a recomposed onClick /
+    // tilt value is honoured instead of the stale initial capture.
+    val currentOnClick = rememberUpdatedState(onClick)
+    val currentMaxTilt = rememberUpdatedState(maxTiltDegrees)
     pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown()
@@ -79,8 +84,8 @@ fun Modifier.wp7Tilt(maxTiltDegrees: Float = 10f, onClick: () -> Unit): Modifier
             val h = if (size.height <= 0) 1f else size.height.toFloat()
             val nx = (down.position.x / w) * 2f - 1f
             val ny = (down.position.y / h) * 2f - 1f
-            scope.launch { ry.animateTo(nx * maxTiltDegrees, tween(110)) }
-            scope.launch { rx.animateTo(-ny * maxTiltDegrees, tween(110)) }
+            scope.launch { ry.animateTo(nx * currentMaxTilt.value, tween(110)) }
+            scope.launch { rx.animateTo(-ny * currentMaxTilt.value, tween(110)) }
             scope.launch { scale.animateTo(0.96f, tween(110)) }
             val up = waitForUpOrCancellation()
             val settle = spring<Float>(
@@ -90,7 +95,7 @@ fun Modifier.wp7Tilt(maxTiltDegrees: Float = 10f, onClick: () -> Unit): Modifier
             scope.launch { ry.animateTo(0f, settle) }
             scope.launch { rx.animateTo(0f, settle) }
             scope.launch { scale.animateTo(1f, settle) }
-            if (up != null) onClick()
+            if (up != null) currentOnClick.value()
         }
     }.graphicsLayer {
         rotationX = rx.value

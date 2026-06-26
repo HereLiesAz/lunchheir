@@ -88,21 +88,30 @@ class LivePanelView(context: Context) : LinearLayout(context) {
         animateKinetic()
     }
 
-    /** Rebuild the per-character time views (one TextView per glyph) for the current time. */
+    /**
+     * Set the per-character time views (one TextView per glyph). Reuses the existing views and only
+     * adds/removes when the glyph count changes — avoids per-minute allocations and keeps the views
+     * already measured (so the turnstile pivot reads a real height).
+     */
     private fun setTimeChars(text: String) {
-        timeRow.removeAllViews()
-        for (ch in text) {
-            timeRow.addView(
-                TextView(context).apply {
-                    this.text = ch.toString()
-                    setTextColor(HAX_PAPER)
-                    textSize = 48f
-                    letterSpacing = 0.02f
-                    // A large camera distance flattens the perspective so the turnstile reads as a
-                    // crisp swing rather than a heavy fish-eye on big glyphs.
-                    cameraDistance = density * 6000
-                },
-            )
+        if (timeRow.childCount > text.length) {
+            timeRow.removeViews(text.length, timeRow.childCount - text.length)
+        } else {
+            while (timeRow.childCount < text.length) {
+                timeRow.addView(
+                    TextView(context).apply {
+                        setTextColor(HAX_PAPER)
+                        textSize = 48f
+                        letterSpacing = 0.02f
+                        // A large camera distance flattens the perspective so the turnstile reads as
+                        // a crisp swing rather than a heavy fish-eye on big glyphs.
+                        cameraDistance = density * 6000
+                    },
+                )
+            }
+        }
+        for (i in text.indices) {
+            (timeRow.getChildAt(i) as TextView).text = text[i].toString()
         }
     }
 
