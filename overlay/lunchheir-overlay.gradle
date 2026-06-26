@@ -94,6 +94,15 @@ android {
         }
     }
 
+    // Overlay resources (icons, drawables, strings, etc.). Files here override upstream
+    // resources with the same qualified name, using Android's last-source-set-wins rule.
+    def overlayRes = new File(lunchHeirOverlayDir, "res")
+    if (overlayRes.isDirectory()) {
+        sourceSets.named("main").configure { ss ->
+            ss.res.srcDir(overlayRes)
+        }
+    }
+
     // Bundle the Lunch Heir Bridge APK as an asset if a release pipeline placed it here
     // (overlay/bridge-dist/lunchheir-bridge.apk). LunchHeirBridge installs it on request.
     // When absent, nothing is bundled and the installer simply no-ops.
