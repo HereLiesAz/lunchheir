@@ -132,12 +132,12 @@ def main():
                 "        super.onCreate(savedInstanceState)\n"
                 "\n"
                 "        // LunchHeir: initialize home-screen extensions (live recents bar, etc.)\n"
-                "        app.lawnchair.lunchheir.LunchHeirHome.onCreate(this)\n"
+                "        com.hereliesaz.lunchheir.LunchHeirHome.onCreate(this)\n"
                 "\n"
                 "        prefs.launcherTheme.subscribeChanges(this, ::updateTheme)\n",
             ),
         ],
-        applied_marker="app.lawnchair.lunchheir.LunchHeirHome",
+        applied_marker="com.hereliesaz.lunchheir.LunchHeirHome",
     )
 
     # ── Feed bridge: register + trust the bundled Lunch Heir Bridge ─────────────
@@ -196,7 +196,7 @@ def main():
                 "    </application>\n",
                 "        <!-- LunchHeir: Live Panel widget picker (interactive bind flow) -->\n"
                 '        <activity\n'
-                '            android:name="app.lawnchair.lunchheir.LivePanelWidgetPickerActivity"\n'
+                '            android:name="com.hereliesaz.lunchheir.LivePanelWidgetPickerActivity"\n'
                 '            android:exported="false"\n'
                 '            android:theme="@android:style/Theme.Translucent.NoTitleBar" />\n'
                 "    </application>\n",
@@ -229,12 +229,12 @@ def main():
                 "        }\n"
                 "\n"
                 "        // LunchHeir: consolidated feature-toggle section (their own section in Home Screen settings)\n"
-                "        app.lawnchair.lunchheir.LunchHeirFeatureToggles()\n"
+                "        com.hereliesaz.lunchheir.LunchHeirFeatureToggles()\n"
                 "    }\n"
                 "}\n",
             ),
         ],
-        applied_marker="app.lawnchair.lunchheir.LunchHeirFeatureToggles",
+        applied_marker="com.hereliesaz.lunchheir.LunchHeirFeatureToggles",
     )
 
     # ── Settings: contextual Lunch Heir toggles on their native screens ─────────
@@ -262,11 +262,11 @@ def main():
                 "            }\n"
                 "\n"
                 "            // LunchHeir: dock-related feature toggles, inline with the Dock settings\n"
-                "            app.lawnchair.lunchheir.LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.DOCK)\n"
+                "            com.hereliesaz.lunchheir.LunchHeirFeatureTogglesFor(com.hereliesaz.lunchheir.LunchHeirPrefs.Category.DOCK)\n"
                 "        }\n",
             ),
         ],
-        applied_marker="LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.DOCK)",
+        applied_marker="LunchHeirFeatureTogglesFor(com.hereliesaz.lunchheir.LunchHeirPrefs.Category.DOCK)",
     )
 
     folder_prefs = upstream / "lawnchair/src/app/lawnchair/ui/preferences/destinations/FolderPreferences.kt"
@@ -294,12 +294,12 @@ def main():
                 "        }\n"
                 "\n"
                 "        // LunchHeir: folder-related feature toggles, inline with the Folder settings\n"
-                "        app.lawnchair.lunchheir.LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.FOLDERS)\n"
+                "        com.hereliesaz.lunchheir.LunchHeirFeatureTogglesFor(com.hereliesaz.lunchheir.LunchHeirPrefs.Category.FOLDERS)\n"
                 "    }\n"
                 "}\n",
             ),
         ],
-        applied_marker="LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.FOLDERS)",
+        applied_marker="LunchHeirFeatureTogglesFor(com.hereliesaz.lunchheir.LunchHeirPrefs.Category.FOLDERS)",
     )
 
     general_prefs = upstream / "lawnchair/src/app/lawnchair/ui/preferences/destinations/GeneralPreferences.kt"
@@ -325,12 +325,12 @@ def main():
                 "        }\n"
                 "\n"
                 "        // LunchHeir: general feature toggles (e.g. monochrome), inline with General settings\n"
-                "        app.lawnchair.lunchheir.LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.GENERAL)\n"
+                "        com.hereliesaz.lunchheir.LunchHeirFeatureTogglesFor(com.hereliesaz.lunchheir.LunchHeirPrefs.Category.GENERAL)\n"
                 "    }\n"
                 "}\n",
             ),
         ],
-        applied_marker="LunchHeirFeatureTogglesFor(app.lawnchair.lunchheir.LunchHeirPrefs.Category.GENERAL)",
+        applied_marker="LunchHeirFeatureTogglesFor(com.hereliesaz.lunchheir.LunchHeirPrefs.Category.GENERAL)",
     )
 
     # ── Groups: load + render (additive, dormant until a group row exists) ──────
@@ -348,7 +348,7 @@ def main():
                 "                Favorites.ITEM_TYPE_APP_PAIR -> processFolderOrAppPair()\n",
                 "                Favorites.ITEM_TYPE_FOLDER,\n"
                 "                Favorites.ITEM_TYPE_APP_PAIR -> processFolderOrAppPair()\n"
-                "                app.lawnchair.lunchheir.group.GroupInfo.ITEM_TYPE_GROUP -> processFolderOrAppPair()\n",
+                "                com.hereliesaz.lunchheir.group.GroupInfo.ITEM_TYPE_GROUP -> processFolderOrAppPair()\n",
             ),
             (
                 "        c.applyCommonProperties(collection)\n"
@@ -358,8 +358,8 @@ def main():
                 "        collection.spanY = 1\n",
                 "        // LunchHeir: upgrade the placeholder Folder to a Group, which renders inline and keeps\n"
                 "        // its multi-cell span (unlike folders/app-pairs, forced to 1x1 below).\n"
-                "        if (c.itemType == app.lawnchair.lunchheir.group.GroupInfo.ITEM_TYPE_GROUP && collection is FolderInfo) {\n"
-                "            val newGroup = app.lawnchair.lunchheir.group.GroupInfo()\n"
+                "        if (c.itemType == com.hereliesaz.lunchheir.group.GroupInfo.ITEM_TYPE_GROUP && collection is FolderInfo) {\n"
+                "            val newGroup = com.hereliesaz.lunchheir.group.GroupInfo()\n"
                 "            collection.getContents().forEach(newGroup::add)\n"
                 "            collection = newGroup\n"
                 "        }\n"
@@ -367,13 +367,13 @@ def main():
                 "        c.applyCommonProperties(collection)\n"
                 "        // Do not trim the folder label, as is was set by the user.\n"
                 "        collection.title = c.getString(c.mTitleIndex)\n"
-                "        if (collection !is app.lawnchair.lunchheir.group.GroupInfo) {\n"
+                "        if (collection !is com.hereliesaz.lunchheir.group.GroupInfo) {\n"
                 "            collection.spanX = 1\n"
                 "            collection.spanY = 1\n"
                 "        }\n",
             ),
         ],
-        applied_marker="app.lawnchair.lunchheir.group.GroupInfo",
+        applied_marker="com.hereliesaz.lunchheir.group.GroupInfo",
     )
 
     inflater = upstream / "src/com/android/launcher3/util/ItemInflater.kt"
@@ -384,11 +384,11 @@ def main():
         edits=[
             (
                 '            else -> throw RuntimeException("Invalid Item Type")\n',
-                "            app.lawnchair.lunchheir.group.GroupInfo.ITEM_TYPE_GROUP ->\n"
-                "                return app.lawnchair.lunchheir.group.GroupView.inflate(\n"
+                "            com.hereliesaz.lunchheir.group.GroupInfo.ITEM_TYPE_GROUP ->\n"
+                "                return com.hereliesaz.lunchheir.group.GroupView.inflate(\n"
                 "                    context,\n"
                 "                    parent,\n"
-                "                    item as app.lawnchair.lunchheir.group.GroupInfo,\n"
+                "                    item as com.hereliesaz.lunchheir.group.GroupInfo,\n"
                 "                ).apply {\n"
                 "                    onFocusChangeListener = focusListener\n"
                 "                    // LunchHeir: drag/reorder the group as a unit, like any workspace item\n"
@@ -397,7 +397,7 @@ def main():
                 '            else -> throw RuntimeException("Invalid Item Type")\n',
             ),
         ],
-        applied_marker="app.lawnchair.lunchheir.group.GroupView",
+        applied_marker="com.hereliesaz.lunchheir.group.GroupView",
     )
 
     # ── Nested folders: let a folder be dropped into a folder (gated, opt-in) ────
@@ -415,10 +415,10 @@ def main():
                 "                || itemType == ITEM_TYPE_APP_PAIR\n"
                 "                // LunchHeir: accept a folder into a folder when nesting is enabled (opt-in)\n"
                 "                || (itemType == com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER\n"
-                "                    && app.lawnchair.lunchheir.folder.NestedFolders.isAccepting());\n",
+                "                    && com.hereliesaz.lunchheir.folder.NestedFolders.isAccepting());\n",
             ),
         ],
-        applied_marker="app.lawnchair.lunchheir.folder.NestedFolders.isAccepting",
+        applied_marker="com.hereliesaz.lunchheir.folder.NestedFolders.isAccepting",
     )
 
     # ── Nested folders: cycle/depth guard on folder-into-folder drops ───────────
@@ -434,10 +434,10 @@ def main():
                 "        return (willAcceptItemType(item.itemType) && item != mInfo && !mFolder.isOpen());\n",
                 "        return (willAcceptItemType(item.itemType) && item != mInfo && !mFolder.isOpen()\n"
                 "                // LunchHeir: refuse folder-into-folder drops that would cycle or over-nest\n"
-                "                && app.lawnchair.lunchheir.folder.NestedFolders.canDrop(mInfo, item));\n",
+                "                && com.hereliesaz.lunchheir.folder.NestedFolders.canDrop(mInfo, item));\n",
             ),
         ],
-        applied_marker="app.lawnchair.lunchheir.folder.NestedFolders.canDrop",
+        applied_marker="com.hereliesaz.lunchheir.folder.NestedFolders.canDrop",
     )
 
     # ── Nested folders: render a sub-folder as a FolderIcon inside its parent ────
@@ -478,10 +478,10 @@ def main():
                 "                    || info.itemType == ITEM_TYPE_APPLICATION\n"
                 "                    // LunchHeir: allow a folder inside a folder when nesting is enabled (opt-in)\n"
                 "                    || (info.itemType == com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER\n"
-                "                        && app.lawnchair.lunchheir.folder.NestedFolders.isEnabled(mContext)))\n",
+                "                        && com.hereliesaz.lunchheir.folder.NestedFolders.isEnabled(mContext)))\n",
             ),
         ],
-        applied_marker="app.lawnchair.lunchheir.folder.NestedFolders",
+        applied_marker="com.hereliesaz.lunchheir.folder.NestedFolders",
     )
 
     # ── Groups: create by promoting a folder ────────────────────────────────────
@@ -503,7 +503,7 @@ def main():
                 "        mFolderName.setSelectAllOnFocus(true);\n"
                 "        // LunchHeir: long-press the folder label to convert the folder into a group\n"
                 "        mFolderName.setOnLongClickListener(v ->\n"
-                "                app.lawnchair.lunchheir.group.GroupPromotion.onFolderLabelLongPress(getContext(), mInfo));\n",
+                "                com.hereliesaz.lunchheir.group.GroupPromotion.onFolderLabelLongPress(getContext(), mInfo));\n",
             ),
         ],
         applied_marker="GroupPromotion.onFolderLabelLongPress",
