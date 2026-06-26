@@ -33,8 +33,7 @@ parent repo stays clean; only the submodule **pointer** changes are ever committ
 |---|---|---|
 | Backup compatibility | `LawnchairBackup.kt` | write `lunchheir_info.pb`; read both — one-directional compat |
 | Home-screen hook | `LawnchairLauncher.kt` | one line into `onCreate` → `LunchHeirHome.onCreate(this)` |
-| Feed bridge trust | `FeedBridge.kt` | prefer + trust the bundled bridge by signature |
-| Bridge install permission | `AndroidManifest.xml` | `REQUEST_INSTALL_PACKAGES` |
+| Feed bridge trust | `FeedBridge.kt` | prefer + trust the user-installed bridge by signature |
 | Live Panel picker activity | `AndroidManifest.xml` | declare `LivePanelWidgetPickerActivity` |
 | Groups: load + render | `WorkspaceItemProcessor.kt`, `ItemInflater.kt` | route `ITEM_TYPE_GROUP`, inflate `GroupView` (drag-enabled) |
 | Groups: create | `Folder.java` | long-press folder label → `GroupPromotion.onFolderLabelLongPress` |
@@ -67,7 +66,7 @@ type-safe accessors for those, forcing verbose `configure<…>()` with AGP-inter
 All Lunch Heir source is under `overlay/src/app/lawnchair/lunchheir/`:
 
 - root — home wiring (`LunchHeirHome`), recents bar, second hotseat, Hax shell/system/settings, Live
-  Panel (+ host + picker activity), prefs, bridge installer.
+  Panel (+ host + picker activity), prefs, bridge download helper.
 - `group/` — Groups: `GroupInfo`, `GroupView`, `GroupPromotion`, `GroupAppMonitor`,
   `SmartGroupSeeder`, `SmartGroupRegistry`.
 - `folder/` — `NestedFolders` (the nesting gate + cycle/depth guard).
