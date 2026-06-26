@@ -8,10 +8,8 @@ name: Auto-update Lawnchair submodule
 # It never pushes a breaking bump to main on its own.
 
 on:
-  # Scheduled auto-bump is PAUSED. 16-dev is a force-pushing branch: a pinned tip can be rebased
-  # away, which breaks every checkout of main — and this workflow can't self-heal because its own
-  # checkout fails first. Re-enable the schedule only once the submodule init is made resilient
-  # (fall back to the branch tip when the pin is unreachable). Until then, run it manually.
+  schedule:
+    - cron: "27 */6 * * *"   # every 6 hours (off-minute); only builds when upstream actually moved
   workflow_dispatch:
 
 concurrency:
@@ -27,18 +25,22 @@ jobs:
   bump:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (with submodules)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
 
       - name: Move submodule to latest 16-dev
         id: bump
         run: |
-          BEFORE=$(git -C upstream rev-parse HEAD)
-          git submodule update --remote upstream
-          git -C upstream submodule update --init --recursive
+          # Clone the branch tip fresh rather than init the pinned commit: 16-dev is force-pushing,
+          # so the committed pin may be unreachable. BEFORE is the committed gitlink; AFTER is the tip.
+          BEFORE=$(git ls-tree HEAD upstream | awk '{print $3}')
+          url=$(git config -f .gitmodules submodule.upstream.url)
+          branch=$(git config -f .gitmodules submodule.upstream.branch 2>/dev/null || echo "16-dev")
+          rm -rf upstream
+          git clone --depth=1 --branch "$branch" "$url" upstream
+          git -C upstream submodule update --init --recursive --depth=1
           AFTER=$(git -C upstream rev-parse HEAD)
           echo "before=$BEFORE" >> "$GITHUB_OUTPUT"
           echo "after=$AFTER" >> "$GITHUB_OUTPUT"

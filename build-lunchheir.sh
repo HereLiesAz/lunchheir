@@ -13,7 +13,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ ! -e "$ROOT/upstream/settings.gradle" ]; then
   echo "upstream submodule not initialized — running: git submodule update --init --recursive"
-  git -C "$ROOT" submodule update --init --recursive
+  if ! git -C "$ROOT" submodule update --init --recursive; then
+    # 16-dev is a force-pushing branch: the pinned commit may have been rebased away. Fall back
+    # to the branch tip so the build still works (same as the CI init-upstream action).
+    echo "Pinned upstream commit unreachable (upstream likely rebased) — falling back to the branch tip."
+    url=$(git -C "$ROOT" config -f .gitmodules submodule.upstream.url)
+    branch=$(git -C "$ROOT" config -f .gitmodules submodule.upstream.branch 2>/dev/null || echo 16-dev)
+    rm -rf "$ROOT/upstream"
+    git clone --depth=1 --branch "$branch" "$url" "$ROOT/upstream"
+    git -C "$ROOT/upstream" submodule update --init --recursive --depth=1
+  fi
 fi
 
 # Apply the source-level overlay (backup compatibility) to the submodule working tree.
