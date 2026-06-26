@@ -1,5 +1,6 @@
 package app.lawnchair.lunchheir
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -65,6 +66,10 @@ object HaxShell {
                     sheet.close(true)
                     LunchHeirSettings.show(launcher)
                 },
+                onAddWidget = {
+                    sheet.close(true)
+                    launcher.startActivity(Intent(launcher, LivePanelWidgetPickerActivity::class.java))
+                },
             )
         }
     }
@@ -77,6 +82,7 @@ fun HaxMenu(
     onSettings: () -> Unit,
     onSystem: () -> Unit,
     onTweaks: () -> Unit,
+    onAddWidget: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -89,6 +95,7 @@ fun HaxMenu(
         HaxEntry(text = "SETTINGS", onClick = onSettings)
         HaxEntry(text = "SYSTEM", onClick = onSystem)
         HaxEntry(text = "TWEAKS", onClick = onTweaks)
+        HaxEntry(text = "ADD PANEL", onClick = onAddWidget)
     }
 }
 

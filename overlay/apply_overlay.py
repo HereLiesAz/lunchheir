@@ -196,6 +196,25 @@ def main():
         applied_marker="REQUEST_INSTALL_PACKAGES",
     )
 
+    # ── Manifest: declare the Live Panel widget picker activity ─────────────────
+    # Overlay-owned translucent activity that runs the interactive widget pick/bind/configure flow
+    # for a Live Panel, so no onActivityResult patch to the launcher is needed.
+    edit_file(
+        manifest,
+        edits=[
+            (
+                "    </application>\n",
+                "        <!-- LunchHeir: Live Panel widget picker (interactive bind flow) -->\n"
+                '        <activity\n'
+                '            android:name="app.lawnchair.lunchheir.LivePanelWidgetPickerActivity"\n'
+                '            android:exported="false"\n'
+                '            android:theme="@android:style/Theme.Translucent.NoTitleBar" />\n'
+                "    </application>\n",
+            ),
+        ],
+        applied_marker="LivePanelWidgetPickerActivity",
+    )
+
     # ── Groups: load + render (additive, dormant until a group row exists) ──────
     # Route ITEM_TYPE_GROUP rows through the folder/app-pair processor, upgrade the placeholder
     # to a GroupInfo (keeping its multi-cell span), and inflate a GroupView for it. All branches
@@ -252,7 +271,11 @@ def main():
                 "                    context,\n"
                 "                    parent,\n"
                 "                    item as app.lawnchair.lunchheir.group.GroupInfo,\n"
-                "                )\n"
+                "                ).apply {\n"
+                "                    onFocusChangeListener = focusListener\n"
+                "                    // LunchHeir: drag/reorder the group as a unit, like any workspace item\n"
+                "                    setOnLongClickListener(com.android.launcher3.touch.ItemLongClickListener.INSTANCE_WORKSPACE)\n"
+                "                }\n"
                 '            else -> throw RuntimeException("Invalid Item Type")\n',
             ),
         ],
@@ -273,11 +296,53 @@ def main():
                 "                || itemType == ITEM_TYPE_APP_PAIR;\n",
                 "                || itemType == ITEM_TYPE_APP_PAIR\n"
                 "                // LunchHeir: accept a folder into a folder when nesting is enabled (opt-in)\n"
-                "                || (itemType == LauncherSettings.Favorites.ITEM_TYPE_FOLDER\n"
+                "                || (itemType == com.android.launcher3.LauncherSettings.Favorites.ITEM_TYPE_FOLDER\n"
                 "                    && app.lawnchair.lunchheir.folder.NestedFolders.isAccepting());\n",
             ),
         ],
         applied_marker="app.lawnchair.lunchheir.folder.NestedFolders.isAccepting",
+    )
+
+    # ── Nested folders: cycle/depth guard on folder-into-folder drops ───────────
+    # FolderIcon.willAcceptItem has both the target folder (mInfo) and the dragged item, so it's the
+    # place to refuse a drop that would create a cycle (which renders forever) or nest too deep.
+    foldericon = upstream / "src/com/android/launcher3/folder/FolderIcon.java"
+    if not foldericon.is_file():
+        sys.exit(f"ERROR: expected file missing: {foldericon}")
+    edit_file(
+        foldericon,
+        edits=[
+            (
+                "        return (willAcceptItemType(item.itemType) && item != mInfo && !mFolder.isOpen());\n",
+                "        return (willAcceptItemType(item.itemType) && item != mInfo && !mFolder.isOpen()\n"
+                "                // LunchHeir: refuse folder-into-folder drops that would cycle or over-nest\n"
+                "                && app.lawnchair.lunchheir.folder.NestedFolders.canDrop(mInfo, item));\n",
+            ),
+        ],
+        applied_marker="app.lawnchair.lunchheir.folder.NestedFolders.canDrop",
+    )
+
+    # ── Nested folders: render a sub-folder as a FolderIcon inside its parent ────
+    # FolderPagedView.createNewView casts every non-app-pair child to WorkspaceItemInfo, so a folder
+    # child would crash. Add a FolderInfo branch that inflates a real FolderIcon. Safe always-on:
+    # with nesting off no folder child exists, and handling one beats crashing.
+    folderpaged = upstream / "src/com/android/launcher3/folder/FolderPagedView.java"
+    if not folderpaged.is_file():
+        sys.exit(f"ERROR: expected file missing: {folderpaged}")
+    edit_file(
+        folderpaged,
+        edits=[
+            (
+                "                    getContext()), null , api, BubbleTextView.DISPLAY_FOLDER);\n"
+                "        } else {\n",
+                "                    getContext()), null , api, BubbleTextView.DISPLAY_FOLDER);\n"
+                "        } else if (item instanceof com.android.launcher3.model.data.FolderInfo lhFolder) {\n"
+                "            // LunchHeir: a nested folder renders as a folder icon inside its parent folder\n"
+                "            icon = FolderIcon.inflateIcon(R.layout.folder_icon, mFolder.mActivityContext, null, lhFolder);\n"
+                "        } else {\n",
+            ),
+        ],
+        applied_marker="LunchHeir: a nested folder renders as a folder icon",
     )
 
     # ── Nested folders: allow a folder as a child of a collection (gated, opt-in) ─
@@ -324,6 +389,24 @@ def main():
             ),
         ],
         applied_marker="GroupPromotion.onFolderLabelLongPress",
+    )
+
+    # ── Disable the Gradle configuration cache ──────────────────────────────────
+    # Lunch Heir's version bump (overlay/lunchheir-overlay.gradle) runs at configuration
+    # time so it fires on EVERY build (per-compile version). Upstream enables the config
+    # cache, which would cache the configuration and skip the bump (and rejects config-time
+    # file writes). Turn it off for the overlaid build; later keys win in gradle.properties.
+    gradle_props = upstream / "gradle.properties"
+    if not gradle_props.is_file():
+        sys.exit(f"ERROR: expected file missing: {gradle_props}")
+    append_once(
+        gradle_props,
+        marker="# LunchHeir: per-compile versioning",
+        text_to_append=(
+            "\n# LunchHeir: per-compile versioning bumps version.properties at configuration\n"
+            "# time, so the configuration cache must stay off (it would skip the re-run).\n"
+            "org.gradle.configuration-cache=false\n"
+        ),
     )
 
     # ── Apply the Lunch Heir Gradle overlay ─────────────────────────────────────

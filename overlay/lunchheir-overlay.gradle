@@ -14,6 +14,74 @@
 
 def lunchHeirOverlayDir = new File(rootDir, "../overlay").canonicalFile
 
+// ── Auto-incrementing version ────────────────────────────────────────────────
+// version.properties (at the Lunch Heir repo root, one level above the upstream Gradle
+// rootDir) is the single source of truth. The counters are bumped here at configuration
+// time, which runs for EVERY build, so the version advances no matter where, what flavor,
+// or what build type — not just in CI. (apply_overlay.py disables Gradle's configuration
+// cache for the overlaid build so this re-runs on every build; with the cache on, a cached
+// configuration would not re-run and the per-compile bump would be skipped.)
+//
+//   versionMajor  manual (owner).      versionMinor  manual (maintainer).
+//   versionPatch  +1 each compile; resets to 0 when versionMinor changes.
+//   versionBuild  +1 each compile; never resets.
+//
+// versionName = major.minor.patch.build ; versionCode = versionBuild (monotonic). The
+// release workflow reads the same version.properties back so the published artifact's name
+// matches the APK's embedded version exactly.
+def lhVersionPropsFile = new File(rootDir, "../version.properties").canonicalFile
+def lhProps = new Properties()
+if (lhVersionPropsFile.exists()) {
+    lhVersionPropsFile.withInputStream { lhProps.load(it) }
+}
+int lhMajor = lhProps.getProperty("versionMajor", "1").trim().toInteger()
+int lhMinor = lhProps.getProperty("versionMinor", "0").trim().toInteger()
+int lhPatch = lhProps.getProperty("versionPatch", "0").trim().toInteger()
+int lhBuild = lhProps.getProperty("versionBuild", "0").trim().toInteger()
+int lhMarker = lhProps.getProperty("versionMinorAtLastReset", "-1").trim().toInteger()
+
+// Per-compile increment. versionBuild is also floored at the git commit count so it stays
+// monotonic across CI runs (which build every commit but don't commit the bumped file back)
+// without a commit-back loop; local per-compile builds still advance it past the floor.
+int lhGitCount = 0
+try {
+    def proc = ["git", "-C", lhVersionPropsFile.parentFile.absolutePath,
+                "rev-list", "--count", "HEAD"].execute()
+    proc.waitFor()
+    if (proc.exitValue() == 0) lhGitCount = proc.text.trim().toInteger()
+} catch (ignored) {
+}
+lhBuild = Math.max(lhBuild + 1, lhGitCount)
+if (lhMinor != lhMarker) {
+    lhPatch = 0
+    lhMarker = lhMinor
+} else {
+    lhPatch += 1
+}
+
+lhVersionPropsFile.text = """\
+# Lunch Heir version — the single source of truth, auto-maintained by the build.
+#
+# The version name is  versionMajor.versionMinor.versionPatch.versionBuild
+#
+#   versionMajor  bumped ONLY by the project owner (manual).
+#   versionMinor  bumped by the maintainer (manual, e.g. per release).
+#   versionPatch  +1 on EVERY compile; resets to 0 whenever versionMinor changes.
+#   versionBuild  +1 on EVERY compile; NEVER resets.
+#
+# patch/build are rewritten by overlay/lunchheir-overlay.gradle on every Gradle build.
+# Only edit versionMajor / versionMinor by hand.
+versionMajor=${lhMajor}
+versionMinor=${lhMinor}
+versionPatch=${lhPatch}
+versionBuild=${lhBuild}
+versionMinorAtLastReset=${lhMarker}
+"""
+
+def lhVersionName = "${lhMajor}.${lhMinor}.${lhPatch}.${lhBuild}".toString()
+def lhVersionCode = lhBuild
+println "Lunch Heir version ${lhVersionName} (versionCode ${lhVersionCode})"
+
 android {
     // Attach Lunch Heir overlay sources to the app's main source set. Add to BOTH the
     // java and kotlin source dirs: the Kotlin compile task reads the `kotlin` set, so a
@@ -34,6 +102,11 @@ android {
         sourceSets.named("main").configure { ss -> ss.assets.srcDir(bridgeDist) }
     }
 
+    defaultConfig {
+        versionCode lhVersionCode
+        versionName lhVersionName
+    }
+
     def appIds = [
             github : "com.hereliesaz.lunchheir",
             nightly: "com.hereliesaz.lunchheir.nightly",
@@ -46,6 +119,42 @@ android {
 
     buildTypes.findByName("debug")?.resValue("string", "derived_app_name", "Lunch Heir (Debug)")
     buildTypes.findByName("release")?.resValue("string", "derived_app_name", "Lunch Heir")
+
+    // Release signing: when the pipeline exports a keystore (KEYSTORE_FILE env, decoded from
+    // KEYSTORE_RAW) the RELEASE build is signed with it; otherwise release falls back to the debug
+    // key so the build still succeeds on forks/PRs without the secret. Debug builds always keep the
+    // debug key — only release is ever signed with the release keystore.
+    def ksPath = System.getenv("KEYSTORE_FILE")
+    def releaseSigning
+    if (ksPath && new File(ksPath).isFile()) {
+        signingConfigs {
+            maybeCreate("lunchheir").with {
+                storeFile file(ksPath)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+        releaseSigning = signingConfigs.getByName("lunchheir")
+    } else {
+        releaseSigning = signingConfigs.findByName("debug")
+    }
+    if (releaseSigning != null) {
+        buildTypes.findByName("release")?.signingConfig = releaseSigning
+    }
+}
+
+// Force the Lunch Heir version onto every variant output (plain values, so nothing needs to
+// serialize), winning over any per-variant version logic upstream applies.
+afterEvaluate {
+    if (android.hasProperty("applicationVariants")) {
+        android.applicationVariants.all { variant ->
+            variant.outputs.all { output ->
+                try { output.versionNameOverride = lhVersionName } catch (ignored) {}
+                try { output.versionCodeOverride = lhVersionCode } catch (ignored) {}
+            }
+        }
+    }
 }
 
 dependencies {
