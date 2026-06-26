@@ -1,11 +1,10 @@
 name: Merged Build & Release
 
 # Lunch Heir is an overlay on the upstream Lawnchair submodule — there is no root gradlew / app
-# module. So every job checks out submodules, applies the Lunch Heir source overlay, uses JDK 21,
-# and builds inside upstream/. The published artifact is the RELEASE build (signed with the release
-# keystore), its signature is verified against KEYSTORE_SHA256, and a separate job publishes the
-# Play flavor to Google Play. Versioning is owned by Gradle (overlay/lunchheir-overlay.gradle bumps
-# version.properties every build); this workflow reads it back for the release name.
+# module. This builds the DEBUG apk (GithubDebug flavor, debug-keyed) on every commit and publishes
+# it as a rolling debug pre-release. Signed release APKs and Play uploads are deliberate, separate
+# workflows (release-apk.yml, play-release.yml). Versioning is owned by Gradle
+# (overlay/lunchheir-overlay.gradle bumps version.properties every build); read back here for naming.
 
 on:
   push:
@@ -98,68 +97,23 @@ jobs:
           ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
         run: echo "ARCORE_API_KEY=$ARCORE_API_KEY" >> upstream/local.properties
 
-      - name: Decode signing keystore
-        env:
-          KEYSTORE_RAW: ${{ secrets.KEYSTORE_RAW }}
-        run: |
-          # Empty secret (e.g. on a fork without access) → skip; release then falls back to the
-          # default debug key (overlay signingConfig) rather than failing the build.
-          if [ -z "$KEYSTORE_RAW" ]; then
-            echo "::warning::KEYSTORE_RAW secret is empty — release will use the default debug key."
-            exit 0
-          fi
-          echo "$KEYSTORE_RAW" | base64 -d > "$GITHUB_WORKSPACE/keystore.jks"
-          if [ ! -s "$GITHUB_WORKSPACE/keystore.jks" ]; then
-            echo "::error::Decoded keystore is empty — KEYSTORE_RAW is not valid base64."
-            exit 1
-          fi
-          echo "Keystore decoded ($(stat -c%s "$GITHUB_WORKSPACE/keystore.jks") bytes)"
-
       - name: Apply Lunch Heir source overlay
         run: overlay/apply-overlay.sh
 
-      - name: Build release APK with Gradle
+      - name: Build debug APK with Gradle
         id: gradle-build
         working-directory: upstream
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          # Consumed by the release signingConfig in overlay/lunchheir-overlay.gradle.
-          KEYSTORE_FILE: ${{ github.workspace }}/keystore.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set +e
           # Versioning is handled in Gradle (version.properties bumped on every build).
-          ./gradlew assembleLawnWithQuickstepGithubRelease --build-cache > "$GITHUB_WORKSPACE/build.log" 2>&1
+          ./gradlew assembleLawnWithQuickstepGithubDebug --build-cache > "$GITHUB_WORKSPACE/build.log" 2>&1
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
           cat "$GITHUB_WORKSPACE/build.log"
           exit $EXIT_CODE
-
-      - name: Verify release signing certificate
-        if: success()
-        env:
-          EXPECTED_SHA256: ${{ secrets.KEYSTORE_SHA256 }}
-        run: |
-          if [ -z "$EXPECTED_SHA256" ]; then
-            echo "KEYSTORE_SHA256 not set — skipping signature verification."
-            exit 0
-          fi
-          APK=$(find upstream/build/outputs/apk -name "*.apk" ! -name "*unsigned*" | head -n 1)
-          if [ -z "$APK" ]; then echo "::error::No signed APK found to verify."; exit 1; fi
-          APKSIGNER=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner | sort -V | tail -n 1)
-          ACTUAL=$("$APKSIGNER" verify --print-certs "$APK" | grep -i "SHA-256 digest" | head -n 1 | grep -oiE '[0-9a-fA-F]{64}')
-          NORM_EXP=$(printf '%s' "$EXPECTED_SHA256" | tr -d ': \r\n' | tr 'A-F' 'a-f')
-          NORM_ACT=$(printf '%s' "$ACTUAL" | tr -d ': \r\n' | tr 'A-F' 'a-f')
-          echo "expected: $NORM_EXP"
-          echo "actual:   $NORM_ACT"
-          if [ "$NORM_EXP" != "$NORM_ACT" ]; then
-            echo "::error::APK signing certificate SHA-256 does not match KEYSTORE_SHA256."
-            exit 1
-          fi
-          echo "✅ Signature verified against KEYSTORE_SHA256."
 
       # ------------------------------------------------------------------
       # FAILURE HANDLING
@@ -214,20 +168,19 @@ jobs:
           TAG_NAME="latest-debug-v${MAJOR}.${MINOR}"
           APP_NAME="LunchHeir"
 
-          # Locate the signed release APK.
-          APK_ORIGINAL=$(find upstream/build/outputs/apk -name "*.apk" ! -name "*unsigned*" | head -n 1)
+          APK_ORIGINAL=$(find upstream/build/outputs/apk -name "*.apk" | head -n 1)
           if [ -z "$APK_ORIGINAL" ]; then
              echo "Error: No APK found to release!"
              exit 1
           fi
 
-          TARGET_NAME="${APP_NAME}-${VERSION_NAME}-release.apk"
+          TARGET_NAME="${APP_NAME}-${VERSION_NAME}-debug.apk"
           mv "$APK_ORIGINAL" "$TARGET_NAME"
 
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
           echo "APK_FILE=$TARGET_NAME" >> $GITHUB_ENV
 
-      - name: Publish Release
+      - name: Publish Debug Pre-release
         if: success() && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -235,99 +188,18 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git tag -fa "$TAG_NAME" -m "Latest Build"
+          git tag -fa "$TAG_NAME" -m "Latest Debug Build"
           git push origin "$TAG_NAME" --force
 
           if gh release view "$TAG_NAME" > /dev/null 2>&1; then
              gh release edit "$TAG_NAME" --prerelease \
-               --title "Latest Build ($TAG_NAME)" \
-               --notes "Auto-build from commit $GITHUB_SHA" \
+               --title "Latest Debug Build ($TAG_NAME)" \
+               --notes "Auto debug build from commit $GITHUB_SHA" \
                --target "$GITHUB_SHA"
              gh release upload "$TAG_NAME" "$APK_FILE" --clobber
           else
              gh release create "$TAG_NAME" "$APK_FILE" --prerelease \
-               --title "Latest Build ($TAG_NAME)" \
-               --notes "Auto-build from commit $GITHUB_SHA" \
+               --title "Latest Debug Build ($TAG_NAME)" \
+               --notes "Auto debug build from commit $GITHUB_SHA" \
                --target "$GITHUB_SHA"
           fi
-
-  # ------------------------------------------------------------------
-  # GOOGLE PLAY (Play flavor → internal track). Only on push to main, and only when the
-  # Play service-account secret is present. Requires the app to already exist in the Play
-  # Console (the very first upload must be done manually).
-  # ------------------------------------------------------------------
-  play-publish:
-    needs: build-and-release
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Guard — Play credentials present
-        id: guard
-        env:
-          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-        run: |
-          if [ -z "$PLAY_JSON" ]; then
-            echo "have=false" >> "$GITHUB_OUTPUT"
-            echo "No PLAY_SERVICE_ACCOUNT_JSON — skipping Play publish."
-          else
-            echo "have=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout (with upstream submodule)
-        if: steps.guard.outputs.have == 'true'
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
-
-      - name: Set up JDK 21
-        if: steps.guard.outputs.have == 'true'
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        if: steps.guard.outputs.have == 'true'
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Decode signing keystore
-        if: steps.guard.outputs.have == 'true'
-        env:
-          KEYSTORE_RAW: ${{ secrets.KEYSTORE_RAW }}
-        run: |
-          if [ -n "$KEYSTORE_RAW" ]; then
-            echo "$KEYSTORE_RAW" | base64 -d > "$GITHUB_WORKSPACE/keystore.jks"
-          fi
-
-      - name: Apply Lunch Heir source overlay
-        if: steps.guard.outputs.have == 'true'
-        run: overlay/apply-overlay.sh
-
-      - name: Build Play release bundle (AAB)
-        if: steps.guard.outputs.have == 'true'
-        working-directory: upstream
-        env:
-          KEYSTORE_FILE: ${{ github.workspace }}/keystore.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew bundleLawnWithQuickstepPlayRelease --build-cache
-
-      - name: Locate AAB
-        if: steps.guard.outputs.have == 'true'
-        id: aab
-        run: |
-          AAB=$(find upstream/build/outputs/bundle -name "*.aab" | head -n 1)
-          if [ -z "$AAB" ]; then echo "::error::No AAB produced."; exit 1; fi
-          echo "path=$AAB" >> "$GITHUB_OUTPUT"
-
-      - name: Upload to Google Play (internal track)
-        if: steps.guard.outputs.have == 'true'
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.hereliesaz.lunchheir.play
-          releaseFiles: ${{ steps.aab.outputs.path }}
-          track: internal
-          status: completed
