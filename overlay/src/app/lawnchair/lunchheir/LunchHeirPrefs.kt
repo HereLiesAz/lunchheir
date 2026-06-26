@@ -15,22 +15,22 @@ object LunchHeirPrefs {
 
     private const val PREFS_NAME = "lunchheir_features"
 
-    enum class Feature(val key: String, val default: Boolean) {
-        LIVE_RECENTS_BAR("live_recents_bar", true),
-        SECOND_ROW("second_row", true),
-        HAX_MENU("hax_menu", true),
-        GROUPS("groups", true),
+    enum class Feature(val key: String, val default: Boolean, val label: String) {
+        LIVE_RECENTS_BAR("live_recents_bar", true, "RECENTS BAR"),
+        SECOND_ROW("second_row", true, "SECOND ROW"),
+        HAX_MENU("hax_menu", true, "HAX MENU"),
+        GROUPS("groups", true, "GROUPS"),
 
         // New visual surface; defaults off so it can't overlap the default home until its placement
         // is tuned on-device. Opt-in via setEnabled / the (forthcoming) settings surface.
-        LIVE_PANEL("live_panel", false),
+        LIVE_PANEL("live_panel", false, "LIVE PANEL"),
 
         // Nested folders (folder-in-folder). Off by default: with it off the loader seam is a no-op
         // and folder loading is identical to upstream. Opt-in until the in-folder UI lands.
-        NESTED_FOLDERS("nested_folders", false),
+        NESTED_FOLDERS("nested_folders", false, "NESTED FOLDERS"),
 
         // Hax monochrome shell: desaturate the whole launcher UI to grayscale. Off by default.
-        MONOCHROME("monochrome", false),
+        MONOCHROME("monochrome", false, "MONOCHROME"),
         ;
     }
 

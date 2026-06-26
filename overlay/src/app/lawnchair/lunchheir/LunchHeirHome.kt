@@ -3,24 +3,29 @@ package app.lawnchair.lunchheir
 import android.util.Log
 import android.view.Gravity
 import android.view.View
-import android.widget.FrameLayout
-import android.widget.TextView
+import android.widget.LinearLayout
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import app.lawnchair.LawnchairLauncher
+import com.android.launcher3.InsettableFrameLayout
 import com.android.quickstep.RecentsModel
 
 /**
- * Entry point for Lunch Heir home-screen extensions (the live recents bar and, later, the
- * second persistent row / sections).
+ * Entry point for Lunch Heir home-screen extensions (the live recents bar, the Hax menu, the
+ * second persistent row, the Live Panel, groups, and the monochrome shell).
  *
  * It is invoked from a single-line hook in [LawnchairLauncher.onCreate] (applied to the
  * pristine upstream submodule by overlay/apply_overlay.py) so that all Lunch Heir logic
  * lives here in the overlay and the upstream edit stays one line — keeping the fork easy
  * to rebase onto new Lawnchair releases.
  *
- * It attaches the [LiveRecentsBar] to the DragLayer (so it persists across all home pages) and
- * keeps it bound to the QuickStep [RecentsModel] while the launcher is visible.
+ * Surfaces are attached to the launcher's [com.android.launcher3.dragndrop.DragLayer] so they
+ * persist across all home pages. IMPORTANT: the DragLayer is an [InsettableFrameLayout], whose
+ * `generateLayoutParams` rebuilds any foreign `FrameLayout.LayoutParams` through a
+ * `ViewGroup.LayoutParams` copy constructor that DROPS the gravity field — so a plain
+ * `FrameLayout.LayoutParams(.., Gravity.BOTTOM)` lands top-left. Every view added here therefore
+ * uses an [InsettableFrameLayout.LayoutParams] (which `checkLayoutParams` accepts as-is) so the
+ * gravity we set actually survives. See [attachToDragLayer].
  */
 object LunchHeirHome {
     private const val TAG = "LunchHeirHome"
@@ -32,59 +37,46 @@ object LunchHeirHome {
         // Cache the nested-folders accept flag for the context-free FolderInfo seam (drag accept).
         app.lawnchair.lunchheir.folder.NestedFolders.refresh(launcher)
 
-        // Each feature gates on its own toggle. With all of them off, nothing below is attached and
-        // the user is left with plain Lawnchair (there is no master switch by design).
-        if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.LIVE_RECENTS_BAR)) {
-            setupLiveRecentsBar(launcher, rowHeightPx)
-        }
+        // Bottom row: the Hax menu trigger (start) and the live recents bar (filling the rest) share
+        // ONE row docked to the bottom — so the menu button sits in the recents/dock area, not
+        // floating at the top. Each half gates on its own toggle; with both off the row is skipped.
+        val hasBottomRow = setupBottomRow(launcher, rowHeightPx)
 
         if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.SECOND_ROW)) {
             try {
+                // Sit directly above the bottom row when there is one; otherwise dock to the very
+                // bottom so there's no empty gap below the second row.
+                val secondRowMargin = if (hasBottomRow) rowHeightPx else 0
                 SecondHotseatRow(launcher).also {
-                    attachBottomRow(launcher, it, rowHeightPx, bottomMarginPx = rowHeightPx)
+                    attachToDragLayer(
+                        launcher,
+                        it,
+                        InsettableFrameLayout.LayoutParams.MATCH_PARENT,
+                        rowHeightPx,
+                        Gravity.BOTTOM,
+                        bottomMargin = secondRowMargin,
+                    )
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "could not attach second hotseat row", e)
             }
         }
 
-        if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.HAX_MENU)) {
-            // The Hax menu button: tap to summon the AzNavRail-based menu. Bottom-start corner,
-            // above the two rows.
-            try {
-                val menuButton = TextView(launcher).apply {
-                    text = "≡"
-                    textSize = 28f
-                    val pad = (12 * launcher.resources.displayMetrics.density).toInt()
-                    setPadding(pad, pad, pad, pad)
-                    setOnClickListener { HaxShell.show(launcher) }
-                }
-                val lp = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    Gravity.BOTTOM or Gravity.START,
-                ).apply { bottomMargin = rowHeightPx * 2 }
-                launcher.dragLayer.addView(menuButton, lp)
-            } catch (e: Exception) {
-                Log.w(TAG, "could not attach hax menu button", e)
-            }
-        }
-
         if (LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.LIVE_PANEL)) {
             // The Live Panel: a flat monotone kinetic clock/status slab, top-start, clear of the
-            // bottom rows and menu button. Placement is intentionally simple pending on-device tuning.
+            // bottom rows. Placement is intentionally simple pending on-device tuning.
             try {
                 val panel = LivePanelView(launcher)
                 val margin = (24 * launcher.resources.displayMetrics.density).toInt()
-                val lp = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                attachToDragLayer(
+                    launcher,
+                    panel,
+                    InsettableFrameLayout.LayoutParams.WRAP_CONTENT,
+                    InsettableFrameLayout.LayoutParams.WRAP_CONTENT,
                     Gravity.TOP or Gravity.START,
-                ).apply {
-                    topMargin = margin
-                    marginStart = margin
-                }
-                launcher.dragLayer.addView(panel, lp)
+                    topMargin = margin,
+                    startMargin = margin,
+                )
             } catch (e: Exception) {
                 Log.w(TAG, "could not attach live panel", e)
             }
@@ -115,15 +107,63 @@ object LunchHeirHome {
         Log.d(TAG, "Lunch Heir home extensions initialized")
     }
 
-    private fun setupLiveRecentsBar(launcher: LawnchairLauncher, rowHeightPx: Int) {
-        // The bar lives in the DragLayer (outside the paged Workspace), so it persists across every
-        // home page for free. Guard creation so a failure can't crash home.
-        val recentsBar = try {
-            LiveRecentsBar(launcher).also { attachBottomRow(launcher, it, rowHeightPx, bottomMarginPx = 0) }
-        } catch (e: Exception) {
-            Log.w(TAG, "could not attach live recents bar", e)
-            return
+    /**
+     * Build and attach the bottom row: `[ Hax menu | live recents bar ]`. The menu trigger (an
+     * AzNavRail dropdown) takes its natural width at the start; the recents bar takes the remaining
+     * width. Either half can be absent depending on its toggle.
+     */
+    private fun setupBottomRow(launcher: LawnchairLauncher, rowHeightPx: Int): Boolean {
+        val haxEnabled = LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.HAX_MENU)
+        val recentsEnabled = LunchHeirPrefs.isEnabled(launcher, LunchHeirPrefs.Feature.LIVE_RECENTS_BAR)
+        if (!haxEnabled && !recentsEnabled) return false
+
+        val row = LinearLayout(launcher).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
         }
+
+        if (haxEnabled) {
+            try {
+                val menu = HaxShell.createMenuView(launcher)
+                row.addView(
+                    menu,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                    ),
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "could not attach hax menu", e)
+            }
+        }
+
+        if (recentsEnabled) {
+            try {
+                val recentsBar = LiveRecentsBar(launcher)
+                // weight 1, width 0 → fill whatever the menu leaves.
+                row.addView(
+                    recentsBar,
+                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f),
+                )
+                bindRecents(launcher, recentsBar)
+            } catch (e: Exception) {
+                Log.w(TAG, "could not attach live recents bar", e)
+            }
+        }
+
+        if (row.childCount == 0) return false
+        attachToDragLayer(
+            launcher,
+            row,
+            InsettableFrameLayout.LayoutParams.MATCH_PARENT,
+            rowHeightPx,
+            Gravity.BOTTOM,
+        )
+        return true
+    }
+
+    /** Bind a [LiveRecentsBar] to QuickStep's [RecentsModel], listening only while home is visible. */
+    private fun bindRecents(launcher: LawnchairLauncher, recentsBar: LiveRecentsBar) {
         val recentsModel = RecentsModel.INSTANCE.get(launcher)
 
         // Only listen while the launcher is actually visible: registering for the whole
@@ -148,14 +188,26 @@ object LunchHeirHome {
         })
     }
 
-    private fun attachBottomRow(launcher: LawnchairLauncher, row: View, heightPx: Int, bottomMarginPx: Int) {
-        // Stack rows up from the bottom. Fine-tuning against the hotseat and gesture-nav insets is
-        // a follow-up; for now this proves the integration end to end.
-        val lp = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            heightPx,
-            Gravity.BOTTOM,
-        ).apply { bottomMargin = bottomMarginPx }
-        launcher.dragLayer.addView(row, lp)
+    /**
+     * Add [view] to the DragLayer with an [InsettableFrameLayout.LayoutParams] so the [gravity] is
+     * preserved (a plain `FrameLayout.LayoutParams` would be regenerated and lose it — see the
+     * class kdoc).
+     */
+    private fun attachToDragLayer(
+        launcher: LawnchairLauncher,
+        view: View,
+        width: Int,
+        height: Int,
+        gravity: Int,
+        bottomMargin: Int = 0,
+        topMargin: Int = 0,
+        startMargin: Int = 0,
+    ) {
+        val lp = InsettableFrameLayout.LayoutParams(width, height)
+        lp.gravity = gravity
+        lp.bottomMargin = bottomMargin
+        lp.topMargin = topMargin
+        lp.marginStart = startMargin
+        launcher.dragLayer.addView(view, lp)
     }
 }
