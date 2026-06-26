@@ -104,6 +104,14 @@ object LunchHeirHome {
             }
         }
 
+        // Hax monochrome shell: desaturate the whole launcher UI. Self-gates on the MONOCHROME
+        // toggle (sets the grayscale layer when on, clears it when off), so it's safe to call always.
+        try {
+            app.lawnchair.lunchheir.theme.MonochromeShell.apply(launcher)
+        } catch (e: Exception) {
+            Log.w(TAG, "could not apply monochrome shell", e)
+        }
+
         Log.d(TAG, "Lunch Heir home extensions initialized")
     }
 

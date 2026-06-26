@@ -28,6 +28,9 @@ object LunchHeirPrefs {
         // Nested folders (folder-in-folder). Off by default: with it off the loader seam is a no-op
         // and folder loading is identical to upstream. Opt-in until the in-folder UI lands.
         NESTED_FOLDERS("nested_folders", false),
+
+        // Hax monochrome shell: desaturate the whole launcher UI to grayscale. Off by default.
+        MONOCHROME("monochrome", false),
         ;
     }
 
