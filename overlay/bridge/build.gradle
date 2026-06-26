@@ -50,7 +50,11 @@ android {
             // The Google App only serves the overlay to system or *debuggable* apps, so the
             // shipped bridge must be debuggable even in release.
             debuggable true
-            signingConfig hasKeystore ? signingConfigs.release : signingConfigs.debug
+            if (hasKeystore) {
+                signingConfig signingConfigs.getByName("release")
+            } else {
+                signingConfig signingConfigs.getByName("debug")
+            }
         }
     }
 

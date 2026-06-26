@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
+import android.widget.Toast
 
 /**
  * "Lunch Heir Bridge" companion: detection + a *guide-the-user-to-download* action.
@@ -41,6 +42,9 @@ object LunchHeirBridge {
             )
         } catch (e: Exception) {
             Log.w(TAG, "could not open bridge download page", e)
+            runCatching {
+                Toast.makeText(context, "Couldn't open the download page", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 }
