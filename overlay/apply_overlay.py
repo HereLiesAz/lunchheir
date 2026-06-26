@@ -391,6 +391,24 @@ def main():
         applied_marker="GroupPromotion.onFolderLabelLongPress",
     )
 
+    # ── Disable the Gradle configuration cache ──────────────────────────────────
+    # Lunch Heir's version bump (overlay/lunchheir-overlay.gradle) runs at configuration
+    # time so it fires on EVERY build (per-compile version). Upstream enables the config
+    # cache, which would cache the configuration and skip the bump (and rejects config-time
+    # file writes). Turn it off for the overlaid build; later keys win in gradle.properties.
+    gradle_props = upstream / "gradle.properties"
+    if not gradle_props.is_file():
+        sys.exit(f"ERROR: expected file missing: {gradle_props}")
+    append_once(
+        gradle_props,
+        marker="# LunchHeir: per-compile versioning",
+        text_to_append=(
+            "\n# LunchHeir: per-compile versioning bumps version.properties at configuration\n"
+            "# time, so the configuration cache must stay off (it would skip the re-run).\n"
+            "org.gradle.configuration-cache=false\n"
+        ),
+    )
+
     # ── Apply the Lunch Heir Gradle overlay ─────────────────────────────────────
     # Append one line to the app build script so Lunch Heir branding (applicationId,
     # label) and overlay source dirs are configured in the normal config phase. This

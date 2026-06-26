@@ -16,11 +16,11 @@ def lunchHeirOverlayDir = new File(rootDir, "../overlay").canonicalFile
 
 // ── Auto-incrementing version ────────────────────────────────────────────────
 // version.properties (at the Lunch Heir repo root, one level above the upstream Gradle
-// rootDir) is the single source of truth. The counters are bumped by a TASK at execution
-// time (configuration-cache safe — upstream enables the config cache, which forbids file
-// writes during configuration), and the resulting version is fed to every variant output
-// via the AGP Variant API, so it advances on every build no matter where, what flavor, or
-// what build type — not just in CI.
+// rootDir) is the single source of truth. The counters are bumped here at configuration
+// time, which runs for EVERY build, so the version advances no matter where, what flavor,
+// or what build type — not just in CI. (apply_overlay.py disables Gradle's configuration
+// cache for the overlaid build so this re-runs on every build; with the cache on, a cached
+// configuration would not re-run and the per-compile bump would be skipped.)
 //
 //   versionMajor  manual (owner).      versionMinor  manual (maintainer).
 //   versionPatch  +1 each compile; resets to 0 when versionMinor changes.
@@ -30,31 +30,36 @@ def lunchHeirOverlayDir = new File(rootDir, "../overlay").canonicalFile
 // release workflow reads the same version.properties back so the published artifact's name
 // matches the APK's embedded version exactly.
 def lhVersionPropsFile = new File(rootDir, "../version.properties").canonicalFile
-def lhVersionOutFile = layout.buildDirectory.file("lunchheir/version.txt")
+def lhProps = new Properties()
+if (lhVersionPropsFile.exists()) {
+    lhVersionPropsFile.withInputStream { lhProps.load(it) }
+}
+int lhMajor = lhProps.getProperty("versionMajor", "1").trim().toInteger()
+int lhMinor = lhProps.getProperty("versionMinor", "0").trim().toInteger()
+int lhPatch = lhProps.getProperty("versionPatch", "0").trim().toInteger()
+int lhBuild = lhProps.getProperty("versionBuild", "0").trim().toInteger()
+int lhMarker = lhProps.getProperty("versionMinorAtLastReset", "-1").trim().toInteger()
 
-def lhComputeVersion = tasks.register("lunchHeirComputeVersion") {
-    outputs.file(lhVersionOutFile)
-    outputs.upToDateWhen { false } // bump on every build
-    doLast {
-        def p = new Properties()
-        if (lhVersionPropsFile.exists()) {
-            lhVersionPropsFile.withInputStream { p.load(it) }
-        }
-        int major = p.getProperty("versionMajor", "1").trim().toInteger()
-        int minor = p.getProperty("versionMinor", "0").trim().toInteger()
-        int patch = p.getProperty("versionPatch", "0").trim().toInteger()
-        int build = p.getProperty("versionBuild", "0").trim().toInteger()
-        int marker = p.getProperty("versionMinorAtLastReset", "-1").trim().toInteger()
+// Per-compile increment. versionBuild is also floored at the git commit count so it stays
+// monotonic across CI runs (which build every commit but don't commit the bumped file back)
+// without a commit-back loop; local per-compile builds still advance it past the floor.
+int lhGitCount = 0
+try {
+    def proc = ["git", "-C", lhVersionPropsFile.parentFile.absolutePath,
+                "rev-list", "--count", "HEAD"].execute()
+    proc.waitFor()
+    if (proc.exitValue() == 0) lhGitCount = proc.text.trim().toInteger()
+} catch (ignored) {
+}
+lhBuild = Math.max(lhBuild + 1, lhGitCount)
+if (lhMinor != lhMarker) {
+    lhPatch = 0
+    lhMarker = lhMinor
+} else {
+    lhPatch += 1
+}
 
-        build += 1
-        if (minor != marker) {
-            patch = 0
-            marker = minor
-        } else {
-            patch += 1
-        }
-
-        lhVersionPropsFile.text = """\
+lhVersionPropsFile.text = """\
 # Lunch Heir version — the single source of truth, auto-maintained by the build.
 #
 # The version name is  versionMajor.versionMinor.versionPatch.versionBuild
@@ -66,32 +71,16 @@ def lhComputeVersion = tasks.register("lunchHeirComputeVersion") {
 #
 # patch/build are rewritten by overlay/lunchheir-overlay.gradle on every Gradle build.
 # Only edit versionMajor / versionMinor by hand.
-versionMajor=${major}
-versionMinor=${minor}
-versionPatch=${patch}
-versionBuild=${build}
-versionMinorAtLastReset=${marker}
+versionMajor=${lhMajor}
+versionMinor=${lhMinor}
+versionPatch=${lhPatch}
+versionBuild=${lhBuild}
+versionMinorAtLastReset=${lhMarker}
 """
 
-        def out = lhVersionOutFile.get().asFile
-        out.parentFile.mkdirs()
-        out.text = "${major}.${minor}.${patch}.${build}\n${build}\n"
-        logger.lifecycle("Lunch Heir version ${major}.${minor}.${patch}.${build} (versionCode ${build})")
-    }
-}
-
-// Providers carry the task dependency, so resolving the version runs the bump first.
-def lhNameProvider = lhComputeVersion.map { lhVersionOutFile.get().asFile.readLines()[0].trim() }
-def lhCodeProvider = lhComputeVersion.map { lhVersionOutFile.get().asFile.readLines()[1].trim().toInteger() }
-
-androidComponents {
-    onVariants(selector().all()) { variant ->
-        variant.outputs.each { output ->
-            output.versionName.set(lhNameProvider)
-            output.versionCode.set(lhCodeProvider)
-        }
-    }
-}
+def lhVersionName = "${lhMajor}.${lhMinor}.${lhPatch}.${lhBuild}".toString()
+def lhVersionCode = lhBuild
+println "Lunch Heir version ${lhVersionName} (versionCode ${lhVersionCode})"
 
 android {
     // Attach Lunch Heir overlay sources to the app's main source set. Add to BOTH the
@@ -111,6 +100,11 @@ android {
     def bridgeDist = new File(lunchHeirOverlayDir, "bridge-dist")
     if (bridgeDist.isDirectory()) {
         sourceSets.named("main").configure { ss -> ss.assets.srcDir(bridgeDist) }
+    }
+
+    defaultConfig {
+        versionCode lhVersionCode
+        versionName lhVersionName
     }
 
     def appIds = [
@@ -140,6 +134,19 @@ android {
             }
         }
         buildTypes.findByName("debug")?.signingConfig = signingConfigs.getByName("lunchheir")
+    }
+}
+
+// Force the Lunch Heir version onto every variant output (plain values, so nothing needs to
+// serialize), winning over any per-variant version logic upstream applies.
+afterEvaluate {
+    if (android.hasProperty("applicationVariants")) {
+        android.applicationVariants.all { variant ->
+            variant.outputs.all { output ->
+                try { output.versionNameOverride = lhVersionName } catch (ignored) {}
+                try { output.versionCodeOverride = lhVersionCode } catch (ignored) {}
+            }
+        }
     }
 }
 
