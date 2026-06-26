@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.text.SimpleDateFormat
@@ -24,6 +25,11 @@ import java.util.Locale
  * a later increment; the panel surface and its kinetic refresh are proven here first.
  *
  * The ticker is bound to window attach/detach so it never runs (or leaks) while off-screen.
+ *
+ * When the user has bound a real app widget (via [LivePanelHost]), the panel hosts that widget
+ * instead of the clock, reusing the launcher's running widget host so it updates live. With no
+ * widget bound it shows the kinetic clock below. Choosing/binding a widget is an interactive,
+ * device-tested step; the hosting and the fallback are proven here.
  */
 class LivePanelView(context: Context) : LinearLayout(context) {
 
@@ -47,6 +53,9 @@ class LivePanelView(context: Context) : LinearLayout(context) {
         gravity = Gravity.START
     }
 
+    /** Holds a hosted app widget when one is bound; hidden (and the clock shown) otherwise. */
+    private val widgetHost = FrameLayout(context).apply { visibility = GONE }
+
     private val tick = object : Runnable {
         override fun run() {
             render()
@@ -64,6 +73,7 @@ class LivePanelView(context: Context) : LinearLayout(context) {
         setBackgroundColor(SLAB)
         addView(time)
         addView(date)
+        addView(widgetHost)
     }
 
     private fun render() {
@@ -85,8 +95,18 @@ class LivePanelView(context: Context) : LinearLayout(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        lastRendered = null
-        handler.post(tick)
+        // Prefer a hosted app widget when one is bound; otherwise run the kinetic clock.
+        val launcher = com.android.launcher3.Launcher.getLauncher(context) as? app.lawnchair.LawnchairLauncher
+        val hosted = launcher != null && LivePanelHost.embed(launcher, widgetHost)
+        time.visibility = if (hosted) GONE else VISIBLE
+        date.visibility = if (hosted) GONE else VISIBLE
+        widgetHost.visibility = if (hosted) VISIBLE else GONE
+        if (hosted) {
+            handler.removeCallbacks(tick)
+        } else {
+            lastRendered = null
+            handler.post(tick)
+        }
     }
 
     override fun onDetachedFromWindow() {
