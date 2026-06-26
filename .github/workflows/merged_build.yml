@@ -63,6 +63,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ steps.collect.outputs.build_number }}
-          name: Lunch Heir build ${{ steps.collect.outputs.build_number }}
+          name: Lunch Heir debug build ${{ steps.collect.outputs.build_number }}
           files: dist/*.apk
           generate_release_notes: true
+          # Debug-signed artifact -> mark as a pre-release (never "Latest").
+          prerelease: true
