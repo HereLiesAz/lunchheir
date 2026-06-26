@@ -10,7 +10,7 @@ private `SharedPreferences`; the settings sheet (Hax shell → TWEAKS) flips the
 |---|---|---|---|
 | `LIVE_RECENTS_BAR` | `live_recents_bar` | **on** | the swipe-to-dismiss recent-apps bar |
 | `SECOND_ROW` | `second_row` | **on** | the second persistent hotseat row |
-| `HAX_MENU` | `hax_menu` | **on** | the Hax menu button + shell |
+| `HAX_MENU` | `hax_menu` | **on** | the Hax dropdown menu (in the recents row) + shell |
 | `GROUPS` | `groups` | **on** | group creation, drag, auto-accept, smart-fill |
 | `LIVE_PANEL` | `live_panel` | off | the Live Panel surface |
 | `NESTED_FOLDERS` | `nested_folders` | off | folder-inside-a-folder |
@@ -30,17 +30,25 @@ All attached in `LunchHeirHome.onCreate`, in the DragLayer so they persist acros
 ## Hax shell
 
 The "Hax"-style launcher shell — flat, monotone, typography-forward — built on the **AzNavRail**
-(`com.github.HereLiesAz:AzNavRail`) library, hosted in Lawnchair's `ComposeBottomSheet`.
+(`com.github.HereLiesAz:AzNavRail`) library.
 
-- **Menu** (`HaxShell`) — a menu button (bottom-start) summons sections: APPS, SEARCH, SETTINGS,
-  SYSTEM, TWEAKS, ADD PANEL — each a kinetic AzNavRail entry wired to the real launcher action.
+- **Menu** (`HaxShell`) — AzNavRail's standalone **`AzDropdownMenu`**: a small docked header icon
+  embedded **in the bottom recents row** (start side, via `HaxShell.createMenuView`), not a floating
+  button. Tapping it expands a flat list — APPS, SETTINGS, SYSTEM, TWEAKS, ADD PANEL — each wired to
+  the real launcher action. Below a divider, **every `LunchHeirPrefs.Feature` is an inline `azToggle`**
+  so the feature switches are discoverable straight from the home screen (toggles that change
+  surfaces attached in `onCreate` apply on the next launcher start).
 - **System** (`HaxSystem`) — a system-actions sheet.
-- **Settings** (`LunchHeirSettings`, the TWEAKS sheet) — flips every feature toggle and configures
-  the smart-fill AI provider (enable, base URL, model, key, wire format).
+- **Settings** (`LunchHeirSettings`, the TWEAKS sheet) — the full settings surface: flips every
+  feature toggle and configures the smart-fill AI provider (enable, base URL, model, key, wire format).
 - **Monochrome** (`MonochromeShell`) — renders the whole launcher UI grayscale via a saturation-0
   color filter on a hardware layer over the DragLayer. Reversible; wallpaper (a separate window)
   stays in colour.
-- **Kinetic type** — the menu entries and the Live Panel clock animate in (spring scale + fade).
+
+> **Note on DragLayer placement.** All home surfaces are added to the DragLayer, which is an
+> `InsettableFrameLayout`; it regenerates a foreign `FrameLayout.LayoutParams` through a copy
+> constructor that **drops `gravity`** (sending the view to top-left). `LunchHeirHome` therefore adds
+> every surface with an `InsettableFrameLayout.LayoutParams` so the bottom/top gravity survives.
 
 ## Live Panels
 
@@ -85,9 +93,12 @@ Created by dragging a folder onto another folder (reuses Launcher3's drag-to-fol
 
 ## Pixel-Bridge feed
 
-`LunchHeirBridge` installs a bundled, self-signed feed-provider companion
-(`com.hereliesaz.lunchheir.bridge`) for the Google Discover feed; `FeedBridge` is patched to prefer
-and trust it by signature match (no hard-coded hash).
+The Discover feed needs a feed provider, and Google only serves it to *debuggable* apps — so the
+provider is a **separate companion app** (`com.hereliesaz.lunchheir.bridge`), not part of the release
+launcher. Lunch Heir does **not** bundle or install it (that would be hostile and a Play-policy
+risk): `LunchHeirBridge.openDownloadPage` guides the user to **download and install it themselves**
+(published by `bridge.yml` as the `bridge-latest` release, signed with the launcher's key). Once
+installed, the patched `FeedBridge` prefers and trusts it by **signature match** (no hard-coded hash).
 
 ## Backup compatibility
 

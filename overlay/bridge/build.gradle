@@ -29,13 +29,32 @@ android {
         aidl true
     }
 
+    // Sign the release bridge with the SAME key as the launcher (KEYSTORE_FILE, decoded from
+    // KEYSTORE_RAW in CI) so FeedBridge trusts it by signature match — no hardcoded hash. Absent the
+    // env (forks/PRs) it falls back to the default debug key so the build still succeeds.
+    def ksFile = System.getenv("KEYSTORE_FILE")
+    def hasKeystore = ksFile != null && new File(ksFile).isFile()
+    if (hasKeystore) {
+        signingConfigs {
+            release {
+                storeFile file(ksFile)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             // The Google App only serves the overlay to system or *debuggable* apps, so the
-            // shipped bridge must be debuggable even in release. Sign the release bridge with
-            // the SAME key as the launcher: FeedBridge then trusts it by signature match
-            // (no hardcoded signature hash needed). See the launcher-side FeedBridge patch.
+            // shipped bridge must be debuggable even in release.
             debuggable true
+            if (hasKeystore) {
+                signingConfig signingConfigs.getByName("release")
+            } else {
+                signingConfig signingConfigs.getByName("debug")
+            }
         }
     }
 
