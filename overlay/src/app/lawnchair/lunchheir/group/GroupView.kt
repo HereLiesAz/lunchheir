@@ -17,8 +17,11 @@ import android.widget.TextView
  * Increment 3 lays the group's child app icons out in an internal grid (columns following the
  * group's [GroupInfo.spanX]), drawing each from its loaded [com.android.launcher3.icons.BitmapInfo]
  * — no coupling to the Launcher3 loader, so it stays additive/dormant. A header label shows the
- * group's title; when the group is empty it falls back to a centered placeholder. Drag/edit and
- * auto-accept are later increments.
+ * group's title; when the group is empty it falls back to a centered placeholder.
+ *
+ * The group **drags as a unit**: ItemInflater wires this view to the workspace long-click/drag
+ * listener, and each child icon forwards its long-press here, so the whole group can be picked up
+ * and reordered like any workspace item (the drop persists via the standard ModelWriter path).
  */
 class GroupView(context: Context) : FrameLayout(context) {
 
@@ -57,6 +60,9 @@ class GroupView(context: Context) : FrameLayout(context) {
                 // Draw straight from the loaded bitmap; no icon-cache round-trip needed here.
                 item.bitmap?.let { setImageDrawable(it.newIcon(context)) }
                 setOnClickListener { item.intent?.let { intent -> context.startActivity(intent) } }
+                // Long-press an icon drags the whole group as a unit (forwarded to the GroupView's
+                // own long-click listener, which ItemInflater sets to the workspace drag listener).
+                setOnLongClickListener { this@GroupView.performLongClick() }
             }
             grid.addView(icon)
         }

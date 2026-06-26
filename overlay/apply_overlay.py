@@ -252,7 +252,11 @@ def main():
                 "                    context,\n"
                 "                    parent,\n"
                 "                    item as app.lawnchair.lunchheir.group.GroupInfo,\n"
-                "                )\n"
+                "                ).apply {\n"
+                "                    onFocusChangeListener = focusListener\n"
+                "                    // LunchHeir: drag/reorder the group as a unit, like any workspace item\n"
+                "                    setOnLongClickListener(com.android.launcher3.touch.ItemLongClickListener.INSTANCE_WORKSPACE)\n"
+                "                }\n"
                 '            else -> throw RuntimeException("Invalid Item Type")\n',
             ),
         ],
