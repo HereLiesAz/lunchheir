@@ -196,6 +196,25 @@ def main():
         applied_marker="REQUEST_INSTALL_PACKAGES",
     )
 
+    # ── Manifest: declare the Live Panel widget picker activity ─────────────────
+    # Overlay-owned translucent activity that runs the interactive widget pick/bind/configure flow
+    # for a Live Panel, so no onActivityResult patch to the launcher is needed.
+    edit_file(
+        manifest,
+        edits=[
+            (
+                "    </application>\n",
+                "        <!-- LunchHeir: Live Panel widget picker (interactive bind flow) -->\n"
+                '        <activity\n'
+                '            android:name="app.lawnchair.lunchheir.LivePanelWidgetPickerActivity"\n'
+                '            android:exported="false"\n'
+                '            android:theme="@android:style/Theme.Translucent.NoTitleBar" />\n'
+                "    </application>\n",
+            ),
+        ],
+        applied_marker="LivePanelWidgetPickerActivity",
+    )
+
     # ── Groups: load + render (additive, dormant until a group row exists) ──────
     # Route ITEM_TYPE_GROUP rows through the folder/app-pair processor, upgrade the placeholder
     # to a GroupInfo (keeping its multi-cell span), and inflate a GroupView for it. All branches
