@@ -2,7 +2,10 @@
 
 Every feature gates on its own toggle in `LunchHeirPrefs.Feature`, checked at its entry point. With
 **all toggles off, Lunch Heir is plain Lawnchair** — there is no master switch. Toggles are stored in
-private `SharedPreferences`; the settings sheet (Hax shell → TWEAKS) flips them.
+private `SharedPreferences` and surfaced in the **launcher Settings** (not the Hax menu): a
+consolidated "Lunch Heir" section at the bottom of **Home Screen** settings lists them all, and each
+toggle is also placed in its natural Lawnchair category (Dock, Folders, …). The overlay renders them
+as native `SwitchPreference`s via `LunchHeirFeatureToggles`, injected by `apply_overlay.py` seams.
 
 ## Toggles
 
@@ -34,13 +37,12 @@ The "Hax"-style launcher shell — flat, monotone, typography-forward — built 
 
 - **Menu** (`HaxShell`) — AzNavRail's standalone **`AzDropdownMenu`**: a small docked header icon
   embedded **in the bottom recents row** (start side, via `HaxShell.createMenuView`), not a floating
-  button. Tapping it expands a flat list — APPS, SETTINGS, SYSTEM, TWEAKS, ADD PANEL — each wired to
-  the real launcher action. Below a divider, **every `LunchHeirPrefs.Feature` is an inline `azToggle`**
-  so the feature switches are discoverable straight from the home screen (toggles that change
-  surfaces attached in `onCreate` apply on the next launcher start).
+  button. Tapping it expands a flat **actions-only** list — APPS, SEARCH, SETTINGS, SYSTEM, TWEAKS,
+  ADD PANEL — each wired to the real launcher action. Feature **toggles are NOT in the menu**; SETTINGS
+  opens Lawnchair's preferences where they live (see [Toggles](#toggles)).
 - **System** (`HaxSystem`) — a system-actions sheet.
-- **Settings** (`LunchHeirSettings`, the TWEAKS sheet) — the full settings surface: flips every
-  feature toggle and configures the smart-fill AI provider (enable, base URL, model, key, wire format).
+- **Settings** (`LunchHeirSettings`, the TWEAKS sheet) — configures the smart-fill AI provider
+  (enable, base URL, model, key, wire format). Feature toggles moved out to the launcher Settings.
 - **Monochrome** (`MonochromeShell`) — renders the whole launcher UI grayscale via a saturation-0
   color filter on a hardware layer over the DragLayer. Reversible; wallpaper (a separate window)
   stays in colour.

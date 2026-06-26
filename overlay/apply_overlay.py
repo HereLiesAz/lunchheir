@@ -205,6 +205,38 @@ def main():
         applied_marker="LivePanelWidgetPickerActivity",
     )
 
+    # ── Settings: consolidated Lunch Heir feature-toggle section ────────────────
+    # Render every Lunch Heir feature toggle as a native PreferenceGroup at the bottom of the Home
+    # Screen settings, so the switches live where users look for settings (not buried in the menu).
+    # The overlay composable (LunchHeirFeatureToggles) bridges our SharedPreferences to Lawnchair's
+    # SwitchPreference. Inserted as the last child of the PreferenceLayout lambda.
+    home_prefs = upstream / "lawnchair/src/app/lawnchair/ui/preferences/destinations/HomeScreenPreferences.kt"
+    if not home_prefs.is_file():
+        sys.exit(f"ERROR: expected file missing: {home_prefs}")
+    edit_file(
+        home_prefs,
+        edits=[
+            (
+                "                    showAsPercentage = true,\n"
+                "                )\n"
+                "            }\n"
+                "        }\n"
+                "    }\n"
+                "}\n",
+                "                    showAsPercentage = true,\n"
+                "                )\n"
+                "            }\n"
+                "        }\n"
+                "\n"
+                "        // LunchHeir: consolidated feature-toggle section (their own section in Home Screen settings)\n"
+                "        app.lawnchair.lunchheir.LunchHeirFeatureToggles()\n"
+                "    }\n"
+                "}\n",
+            ),
+        ],
+        applied_marker="app.lawnchair.lunchheir.LunchHeirFeatureToggles",
+    )
+
     # ── Groups: load + render (additive, dormant until a group row exists) ──────
     # Route ITEM_TYPE_GROUP rows through the folder/app-pair processor, upgrade the placeholder
     # to a GroupInfo (keeping its multi-cell span), and inflate a GroupView for it. All branches

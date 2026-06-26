@@ -35,6 +35,7 @@ parent repo stays clean; only the submodule **pointer** changes are ever committ
 | Home-screen hook | `LawnchairLauncher.kt` | one line into `onCreate` → `LunchHeirHome.onCreate(this)` |
 | Feed bridge trust | `FeedBridge.kt` | prefer + trust the user-installed bridge by signature |
 | Live Panel picker activity | `AndroidManifest.xml` | declare `LivePanelWidgetPickerActivity` |
+| Feature toggles in settings | `HomeScreenPreferences.kt` | consolidated Lunch Heir `SwitchPreference` section |
 | Groups: load + render | `WorkspaceItemProcessor.kt`, `ItemInflater.kt` | route `ITEM_TYPE_GROUP`, inflate `GroupView` (drag-enabled) |
 | Groups: create | `Folder.java` | long-press folder label → `GroupPromotion.onFolderLabelLongPress` |
 | Nested folders: accept | `FolderInfo.java` | accept a folder dropped into a folder (gated) |
