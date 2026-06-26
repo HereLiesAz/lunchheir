@@ -1,0 +1,120 @@
+name: Auto-update Lawnchair submodule
+
+# Keeps the upstream/ submodule tracking the latest Lawnchair 16-dev. Because the Lunch Heir
+# overlay patches upstream source with exact-anchor edits, a bump can only be trusted once the
+# overlay still applies AND the app still builds — so this verifies before proposing the bump:
+#   green  -> opens/updates a PR with the new submodule pointer (review + one-click merge)
+#   red    -> opens an issue naming the stage that broke, so the drifted seam gets re-authored
+# It never pushes a breaking bump to main on its own.
+
+on:
+  schedule:
+    - cron: "27 */6 * * *"   # every 6 hours (off-minute); only builds when upstream actually moved
+  workflow_dispatch:
+
+concurrency:
+  group: upstream-autobump
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Move submodule to latest 16-dev
+        id: bump
+        run: |
+          BEFORE=$(git -C upstream rev-parse HEAD)
+          git submodule update --remote upstream
+          git -C upstream submodule update --init --recursive
+          AFTER=$(git -C upstream rev-parse HEAD)
+          echo "before=$BEFORE" >> "$GITHUB_OUTPUT"
+          echo "after=$AFTER" >> "$GITHUB_OUTPUT"
+          if [ "$BEFORE" = "$AFTER" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Already at latest ($AFTER) — nothing to do."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Lawnchair $BEFORE -> $AFTER"
+          fi
+
+      - name: Set up JDK 21
+        if: steps.bump.outputs.changed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        if: steps.bump.outputs.changed == 'true'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify overlay applies and builds
+        if: steps.bump.outputs.changed == 'true'
+        id: verify
+        run: |
+          set +e
+          overlay/apply-overlay.sh > "$GITHUB_WORKSPACE/apply.log" 2>&1
+          if [ $? -ne 0 ]; then
+            echo "stage=apply-overlay" >> "$GITHUB_OUTPUT"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            cat "$GITHUB_WORKSPACE/apply.log"
+            exit 0
+          fi
+          ( cd upstream && ./gradlew assembleLawnWithQuickstepGithubDebug --build-cache ) \
+            > "$GITHUB_WORKSPACE/build.log" 2>&1
+          if [ $? -ne 0 ]; then
+            echo "stage=build" >> "$GITHUB_OUTPUT"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            tail -c 4000 "$GITHUB_WORKSPACE/build.log"
+            exit 0
+          fi
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open / update bump PR (verified green)
+        if: steps.bump.outputs.changed == 'true' && steps.verify.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="chore/upstream-autobump"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add upstream
+          git commit \
+            -m "chore(upstream): bump Lawnchair submodule to ${{ steps.bump.outputs.after }}" \
+            -m "Auto-update from 16-dev. Overlay applied and GithubDebug built clean."
+          git push -f origin "$BRANCH"
+          if gh pr view "$BRANCH" >/dev/null 2>&1; then
+            echo "PR already open for $BRANCH; branch updated."
+          else
+            gh pr create --base main --head "$BRANCH" \
+              --title "chore: bump Lawnchair submodule to ${{ steps.bump.outputs.after }}" \
+              --body "Automated update of \`upstream/\` to the latest \`16-dev\`. The Lunch Heir overlay applied cleanly and the GithubDebug flavor built successfully, so this bump is safe to merge."
+          fi
+
+      - name: File issue (bump broke the overlay or build)
+        if: steps.bump.outputs.changed == 'true' && steps.verify.outputs.ok == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          STAGE="${{ steps.verify.outputs.stage }}"
+          if [ "$STAGE" = "apply-overlay" ]; then LOG=$(tail -c 4000 "$GITHUB_WORKSPACE/apply.log"); else LOG=$(tail -c 4000 "$GITHUB_WORKSPACE/build.log"); fi
+          # Don't pile up duplicates while a bump is blocked.
+          if gh issue list --state open --search "in:title Upstream bump blocked" | grep -q .; then
+            echo "An open upstream-bump issue already exists; skipping."
+            exit 0
+          fi
+          gh issue create \
+            --title "Upstream bump blocked: Lawnchair ${{ steps.bump.outputs.after }} ($STAGE failed)" \
+            --body "$(printf 'Auto-update to `%s` (from `%s`) failed at **%s** — a Lunch Heir overlay seam likely drifted against the new upstream. Re-author the affected anchor in `overlay/apply_overlay.py`, then the next run (or a manual dispatch) will retry.\n\n```\n%s\n```' "${{ steps.bump.outputs.after }}" "${{ steps.bump.outputs.before }}" "$STAGE" "$LOG")"
