@@ -11,7 +11,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,9 +39,10 @@ import kotlinx.coroutines.launch
  * embedded directly in the bottom recents row (see [LunchHeirHome]) so the trigger sits where the
  * user expects it — in the recents/dock area, not floating at the top of the screen.
  *
- * The dropdown's top section routes the launcher's real actions (APPS, SETTINGS, SYSTEM, TWEAKS,
- * ADD PANEL); below a divider, every [LunchHeirPrefs.Feature] is an inline toggle so the feature
- * switches are discoverable from the home screen without digging into a settings sheet.
+ * The dropdown is **actions only** — APPS, SEARCH, SETTINGS, SYSTEM, TWEAKS, ADD PANEL — each wired
+ * to a real launcher action. Feature TOGGLES are NOT here: they live in the launcher Settings (a
+ * consolidated "Lunch Heir" section in Home Screen settings, plus each toggle in its matching native
+ * category), rendered by [LunchHeirFeatureToggles]. SETTINGS is the path to them.
  */
 object HaxShell {
 
@@ -74,15 +74,10 @@ private fun LunchHeirMenu(launcher: LawnchairLauncher) {
     // throwaway controller is all the component needs.
     val navController = rememberNavController()
 
-    // The AzDropdownMenu content block is a plain DSL scope (AzDropdownMenuScope), NOT a @Composable
-    // lambda — so Compose state must be hoisted HERE, in the composable body, and only read inside
-    // the DSL. One MutableState per feature holds the live checked value; flipping it persists the
-    // pref and (since the read happens in the menu's composition) refreshes the toggle label.
-    val features = remember { LunchHeirPrefs.Feature.values() }
-    val checkedStates = remember {
-        features.map { mutableStateOf(LunchHeirPrefs.isEnabled(launcher, it)) }
-    }
-
+    // Actions only — these are the Hax menu items (the big-typography sections in the original Hax
+    // launcher). Feature TOGGLES do NOT live here: they belong in the launcher Settings (a
+    // consolidated "Lunch Heir" section plus each toggle in its matching Lawnchair category). The
+    // SETTINGS item below is the path to them.
     AzDropdownMenu(navController = navController) {
         azConfig(
             design = AzDropdownDesign.MENU,
@@ -93,36 +88,21 @@ private fun LunchHeirMenu(launcher: LawnchairLauncher) {
         azItem(text = "APPS") {
             launcher.stateManager.goToState(LauncherState.ALL_APPS)
         }
+        azItem(text = "SEARCH") {
+            launcher.stateManager.goToState(LauncherState.ALL_APPS)
+        }
         azItem(text = "SETTINGS") {
             launcher.startActivity(PreferenceActivity.createIntent(launcher, Root))
         }
         azItem(text = "SYSTEM") {
             HaxSystem.show(launcher)
         }
+        // Smart-fill / AI provider config (not feature toggles — those live in launcher Settings).
         azItem(text = "TWEAKS") {
             LunchHeirSettings.show(launcher)
         }
         azItem(text = "ADD PANEL") {
             launcher.startActivity(Intent(launcher, LivePanelWidgetPickerActivity::class.java))
-        }
-
-        azDivider()
-
-        // Every feature toggle, inline — flip them straight from the home screen. closeOnClick is
-        // false so the menu stays open while the user flips several. Changes that need a relaunch to
-        // take effect (e.g. surfaces attached in onCreate) are persisted immediately and apply on the
-        // next launcher start.
-        features.forEachIndexed { i, feature ->
-            val checked = checkedStates[i]
-            azToggle(
-                toggleOnText = "${feature.label} ✓",
-                toggleOffText = "${feature.label} ✗",
-                isChecked = checked.value,
-                closeOnClick = false,
-            ) { enabled ->
-                checked.value = enabled
-                LunchHeirPrefs.setEnabled(launcher, feature, enabled)
-            }
         }
     }
 }
