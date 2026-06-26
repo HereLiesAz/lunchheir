@@ -7,7 +7,7 @@ itself, continuously. The point: move a whole cluster of apps together without h
 icon, and (for smart groups) keep them coherent as the device changes.
 
 Gated by the `GROUPS` toggle (default on). All group code is overlay code under
-`overlay/src/app/lawnchair/lunchheir/group/`; the only upstream edits are the small seams below.
+`overlay/src/com/hereliesaz/lunchheir/group/`; the only upstream edits are the small seams below.
 
 ## Data model (`GroupInfo`)
 
