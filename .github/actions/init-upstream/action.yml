@@ -1,0 +1,24 @@
+name: Init upstream submodule
+description: >
+  Initialize the Lawnchair upstream submodule, falling back to the tracked branch tip if the pinned
+  commit is unreachable. Lawnchair's 16-dev is a force-pushing branch, so a previously-pinned commit
+  can be rebased away — which would otherwise make every checkout fail with "not our ref". The normal
+  path uses the exact pinned commit (reproducible); only an unreachable pin self-heals to the tip.
+
+runs:
+  using: composite
+  steps:
+    - name: Init upstream (pinned, or fall back to branch tip)
+      shell: bash
+      run: |
+        set -e
+        git submodule sync --recursive
+        if git submodule update --init --recursive; then
+          echo "upstream submodule at pinned commit: $(git -C upstream rev-parse HEAD)"
+          exit 0
+        fi
+        echo "::warning::Pinned upstream commit is unreachable (Lawnchair likely rebased 16-dev) — falling back to the branch tip."
+        # --remote ignores the recorded (orphaned) SHA and checks out the tracked branch tip, while
+        # preserving the submodule metadata (no rm -rf / fresh clone).
+        git submodule update --init --recursive --remote --depth=1 upstream
+        echo "upstream submodule fell back to branch tip: $(git -C upstream rev-parse HEAD)"

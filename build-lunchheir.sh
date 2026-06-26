@@ -13,7 +13,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ ! -e "$ROOT/upstream/settings.gradle" ]; then
   echo "upstream submodule not initialized — running: git submodule update --init --recursive"
-  git -C "$ROOT" submodule update --init --recursive
+  if ! git -C "$ROOT" submodule update --init --recursive; then
+    # 16-dev is a force-pushing branch: the pinned commit may have been rebased away. Fall back to
+    # the branch tip so the build still works. --remote ignores the recorded (orphaned) SHA and
+    # checks out the tracked branch tip while preserving the submodule metadata.
+    echo "Pinned upstream commit unreachable (upstream likely rebased) — falling back to the branch tip."
+    git -C "$ROOT" submodule update --init --recursive --remote --depth=1 upstream
+  fi
 fi
 
 # Apply the source-level overlay (backup compatibility) to the submodule working tree.
