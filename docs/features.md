@@ -46,11 +46,13 @@ The "Hax"-style launcher shell — flat, monotone, typography-forward — built 
 - **Monochrome** (`MonochromeShell`) — renders the whole launcher UI grayscale via a saturation-0
   color filter on a hardware layer over the DragLayer. Reversible; wallpaper (a separate window)
   stays in colour.
-- **Kinetic typography** (`KineticType`) — Windows Phone 7 "Metro"-inspired motion: a **turnstile**
-  entrance (each word/glyph swings in around its left edge and fades, staggered, with a snappy
-  fast-out/gentle-settle easing) plus **tilt-on-press**. Applied to the surfaces Lunch Heir renders
-  itself — the `HaxSystem` sheet entries (`KineticWord`) and the Live Panel clock (`LivePanelView`,
-  one turnstiling view per time glyph). The AzNavRail menu gets its kinetic type from the library.
+- **Kinetic typography** — Windows Phone 7 "Metro"-inspired motion: a **turnstile** entrance (each
+  word/glyph swings in around its left edge and fades, staggered, with a snappy fast-out/gentle-settle
+  easing) plus **tilt-on-press**. The **AzNavRail menu** gets it from the library (**AzNavRail 10.14**,
+  via `azConfig(itemTextStyle = …, tiltOnPress = true)`; `itemEntrance` defaults to `Turnstile`). The
+  surfaces AzNavRail doesn't render use Lunch Heir's own `KineticType` primitives — the `HaxSystem`
+  sheet entries (`KineticWord`) and the Live Panel clock (`LivePanelView`, one turnstiling view per
+  time glyph).
 
 > **Note on DragLayer placement.** All home surfaces are added to the DragLayer, which is an
 > `InsettableFrameLayout`; it regenerates a foreign `FrameLayout.LayoutParams` through a copy

@@ -7,6 +7,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.rememberNavController
 import app.lawnchair.LawnchairLauncher
 import app.lawnchair.ui.preferences.PreferenceActivity
@@ -67,6 +70,15 @@ private fun LunchHeirMenu(launcher: LawnchairLauncher) {
             design = AzDropdownDesign.MENU,
             dockingSide = AzDockingSide.LEFT,
             showFooter = false,
+            // WP7 kinetic typography (AzNavRail 10.14+): big light Metro words that turnstile in
+            // (the library default) and tilt on press. Matches the KineticWord look used on the
+            // surfaces AzNavRail doesn't render.
+            itemTextStyle = TextStyle(
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Light,
+                letterSpacing = 1.sp,
+            ),
+            tiltOnPress = true,
         )
 
         azItem(text = "APPS") {

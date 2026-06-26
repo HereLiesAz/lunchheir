@@ -167,14 +167,14 @@ afterEvaluate {
 dependencies {
     // AzNavRail (HereLiesAz) — the rail-that-expands-to-a-menu used to build the Hax shell.
     // jitpack is already configured in the upstream settings.gradle repositories.
-    implementation 'com.github.HereLiesAz:AzNavRail:10.11'
+    implementation 'com.github.HereLiesAz:AzNavRail:10.14'
 }
 
 // Lawnchair runs the cash.licensee plugin to validate dependency licenses. AzNavRail is
 // published via jitpack without SPDX license metadata in its POM, so allow it explicitly
 // (it's a first-party HereLiesAz library).
 licensee {
-    allowDependency('com.github.HereLiesAz', 'AzNavRail', '10.11') {
+    allowDependency('com.github.HereLiesAz', 'AzNavRail', '10.14') {
         because 'First-party Lunch Heir UI library (jitpack POM lacks SPDX license metadata)'
     }
 }
