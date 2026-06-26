@@ -65,7 +65,7 @@ type-safe accessors for those, forcing verbose `configure<…>()` with AGP-inter
 
 ## Feature code (`overlay/src`)
 
-All Lunch Heir source is under `overlay/src/app/lawnchair/lunchheir/`:
+All Lunch Heir source is under `overlay/src/com/hereliesaz/lunchheir/`:
 
 - root — home wiring (`LunchHeirHome`), recents bar, second hotseat, Hax shell/system/settings, Live
   Panel (+ host + picker activity), prefs, bridge download helper.
@@ -82,6 +82,19 @@ upstream schema patch.
 
 The single launcher entry point is `LunchHeirHome.onCreate(launcher)` (the one home-hook seam); every
 feature gates itself there on its own `LunchHeirPrefs.Feature` toggle.
+
+## Naming: three independent layers
+
+"Lawnchair" vs "Lunch Heir" shows up in three places that are deliberately set differently:
+
+- **Installed identity** — the per-flavor `applicationId` is `com.hereliesaz.lunchheir` (set in
+  `lunchheir-overlay.gradle`). This is the package a user/Play store sees.
+- **Our overlay code** — lives in package `com.hereliesaz.lunchheir.*` (it is *our* code, so it
+  carries our name). It still *imports* upstream classes by their real package (`app.lawnchair.*`).
+- **Upstream engine** — the Lawnchair submodule stays `app.lawnchair.*`, and the Gradle **`namespace`
+  (`app.lawnchair`)** drives the generated `R`/`BuildConfig` that thousands of upstream files import.
+  Renaming this would turn the overlay into a hard fork (every Lawnchair update becomes a manual
+  merge), so it is left untouched. It is invisible to users.
 
 ## Versioning
 

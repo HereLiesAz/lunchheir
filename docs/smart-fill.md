@@ -15,7 +15,7 @@ Either side may be user-provided; the engine fills in and keeps refining whichev
 stale. Net: a living group whose title and contents keep re-deriving from its own evolving state
 (seed → new installs → user edits → re-evaluation).
 
-All code is overlay-only under `overlay/src/app/lawnchair/lunchheir/smartfill/`.
+All code is overlay-only under `overlay/src/com/hereliesaz/lunchheir/smartfill/`.
 
 ## Backend — hybrid
 
