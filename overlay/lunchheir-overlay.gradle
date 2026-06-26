@@ -120,9 +120,9 @@ android {
     buildTypes.findByName("debug")?.resValue("string", "derived_app_name", "Lunch Heir (Debug)")
     buildTypes.findByName("release")?.resValue("string", "derived_app_name", "Lunch Heir")
 
-    // Optional signing: when the release pipeline exports a keystore (KEYSTORE_FILE env),
-    // sign the debug build with it so the auto-published artifact has a stable signature.
-    // Absent the env, the default debug key is used (no failure) — mirrors the original.
+    // Optional signing: when the pipeline exports a keystore (KEYSTORE_FILE env, decoded from
+    // KEYSTORE_RAW), sign the RELEASE build with it. Debug builds always keep the default debug
+    // key. Absent the env, release falls back to the debug key (no failure).
     def ksPath = System.getenv("KEYSTORE_FILE")
     if (ksPath && new File(ksPath).isFile()) {
         signingConfigs {
@@ -133,9 +133,8 @@ android {
                 keyPassword System.getenv("KEY_PASSWORD")
             }
         }
-        def lhSigning = signingConfigs.getByName("lunchheir")
-        buildTypes.findByName("debug")?.signingConfig = lhSigning
-        buildTypes.findByName("release")?.signingConfig = lhSigning
+        // Only release builds are signed with the release keystore; debug keeps the debug key.
+        buildTypes.findByName("release")?.signingConfig = signingConfigs.getByName("lunchheir")
     }
 }
 
