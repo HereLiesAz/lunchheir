@@ -14,6 +14,85 @@
 
 def lunchHeirOverlayDir = new File(rootDir, "../overlay").canonicalFile
 
+// ── Auto-incrementing version ────────────────────────────────────────────────
+// version.properties (at the Lunch Heir repo root, one level above the upstream Gradle
+// rootDir) is the single source of truth. The counters are bumped by a TASK at execution
+// time (configuration-cache safe — upstream enables the config cache, which forbids file
+// writes during configuration), and the resulting version is fed to every variant output
+// via the AGP Variant API, so it advances on every build no matter where, what flavor, or
+// what build type — not just in CI.
+//
+//   versionMajor  manual (owner).      versionMinor  manual (maintainer).
+//   versionPatch  +1 each compile; resets to 0 when versionMinor changes.
+//   versionBuild  +1 each compile; never resets.
+//
+// versionName = major.minor.patch.build ; versionCode = versionBuild (monotonic). The
+// release workflow reads the same version.properties back so the published artifact's name
+// matches the APK's embedded version exactly.
+def lhVersionPropsFile = new File(rootDir, "../version.properties").canonicalFile
+def lhVersionOutFile = layout.buildDirectory.file("lunchheir/version.txt")
+
+def lhComputeVersion = tasks.register("lunchHeirComputeVersion") {
+    outputs.file(lhVersionOutFile)
+    outputs.upToDateWhen { false } // bump on every build
+    doLast {
+        def p = new Properties()
+        if (lhVersionPropsFile.exists()) {
+            lhVersionPropsFile.withInputStream { p.load(it) }
+        }
+        int major = p.getProperty("versionMajor", "1").trim().toInteger()
+        int minor = p.getProperty("versionMinor", "0").trim().toInteger()
+        int patch = p.getProperty("versionPatch", "0").trim().toInteger()
+        int build = p.getProperty("versionBuild", "0").trim().toInteger()
+        int marker = p.getProperty("versionMinorAtLastReset", "-1").trim().toInteger()
+
+        build += 1
+        if (minor != marker) {
+            patch = 0
+            marker = minor
+        } else {
+            patch += 1
+        }
+
+        lhVersionPropsFile.text = """\
+# Lunch Heir version — the single source of truth, auto-maintained by the build.
+#
+# The version name is  versionMajor.versionMinor.versionPatch.versionBuild
+#
+#   versionMajor  bumped ONLY by the project owner (manual).
+#   versionMinor  bumped by the maintainer (manual, e.g. per release).
+#   versionPatch  +1 on EVERY compile; resets to 0 whenever versionMinor changes.
+#   versionBuild  +1 on EVERY compile; NEVER resets.
+#
+# patch/build are rewritten by overlay/lunchheir-overlay.gradle on every Gradle build.
+# Only edit versionMajor / versionMinor by hand.
+versionMajor=${major}
+versionMinor=${minor}
+versionPatch=${patch}
+versionBuild=${build}
+versionMinorAtLastReset=${marker}
+"""
+
+        def out = lhVersionOutFile.get().asFile
+        out.parentFile.mkdirs()
+        out.text = "${major}.${minor}.${patch}.${build}\n${build}\n"
+        logger.lifecycle("Lunch Heir version ${major}.${minor}.${patch}.${build} (versionCode ${build})")
+    }
+}
+
+// Providers carry the task dependency, so resolving the version runs the bump first.
+def lhNameProvider = lhComputeVersion.map { lhVersionOutFile.get().asFile.readLines()[0].trim() }
+def lhCodeProvider = lhComputeVersion.map { lhVersionOutFile.get().asFile.readLines()[1].trim().toInteger() }
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.outputs.each { output ->
+            output.versionName.set(lhNameProvider)
+            output.versionCode.set(lhCodeProvider)
+        }
+    }
+}
+
 android {
     // Attach Lunch Heir overlay sources to the app's main source set. Add to BOTH the
     // java and kotlin source dirs: the Kotlin compile task reads the `kotlin` set, so a
@@ -46,6 +125,22 @@ android {
 
     buildTypes.findByName("debug")?.resValue("string", "derived_app_name", "Lunch Heir (Debug)")
     buildTypes.findByName("release")?.resValue("string", "derived_app_name", "Lunch Heir")
+
+    // Optional signing: when the release pipeline exports a keystore (KEYSTORE_FILE env),
+    // sign the debug build with it so the auto-published artifact has a stable signature.
+    // Absent the env, the default debug key is used (no failure) — mirrors the original.
+    def ksPath = System.getenv("KEYSTORE_FILE")
+    if (ksPath && new File(ksPath).isFile()) {
+        signingConfigs {
+            maybeCreate("lunchheir").with {
+                storeFile file(ksPath)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+        buildTypes.findByName("debug")?.signingConfig = signingConfigs.getByName("lunchheir")
+    }
 }
 
 dependencies {
