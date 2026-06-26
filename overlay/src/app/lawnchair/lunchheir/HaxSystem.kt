@@ -39,11 +39,11 @@ object HaxSystem {
                     .padding(horizontal = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                HaxEntry("WIFI") { sheet.close(true); openSettings(launcher, Settings.ACTION_WIFI_SETTINGS) }
-                HaxEntry("BLUETOOTH") { sheet.close(true); openSettings(launcher, Settings.ACTION_BLUETOOTH_SETTINGS) }
-                HaxEntry("SOUND") { sheet.close(true); openSettings(launcher, Settings.ACTION_SOUND_SETTINGS) }
-                HaxEntry("DISPLAY") { sheet.close(true); openSettings(launcher, Settings.ACTION_DISPLAY_SETTINGS) }
-                HaxEntry("FLASHLIGHT") { toggleTorch(launcher) }
+                HaxEntry("WIFI", index = 0) { sheet.close(true); openSettings(launcher, Settings.ACTION_WIFI_SETTINGS) }
+                HaxEntry("BLUETOOTH", index = 1) { sheet.close(true); openSettings(launcher, Settings.ACTION_BLUETOOTH_SETTINGS) }
+                HaxEntry("SOUND", index = 2) { sheet.close(true); openSettings(launcher, Settings.ACTION_SOUND_SETTINGS) }
+                HaxEntry("DISPLAY", index = 3) { sheet.close(true); openSettings(launcher, Settings.ACTION_DISPLAY_SETTINGS) }
+                HaxEntry("FLASHLIGHT", index = 4) { toggleTorch(launcher) }
             }
         }
     }

@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -40,12 +41,13 @@ class LivePanelView(context: Context) : LinearLayout(context) {
     private val handler = Handler(Looper.getMainLooper())
     private var lastRendered: String? = null
 
-    private val time = TextView(context).apply {
-        setTextColor(HAX_PAPER)
-        textSize = 48f
-        letterSpacing = 0.02f
+    // The time is rendered as one TextView per character so each can turnstile in independently
+    // (WP7 kinetic typography). The row is rebuilt whenever the displayed time changes.
+    private val timeRow = LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.START
     }
+    private val turnstileInterp = PathInterpolator(0.1f, 0.9f, 0.2f, 1f)
     private val date = TextView(context).apply {
         setTextColor(HAX_PAPER_DIM)
         textSize = 14f
@@ -71,7 +73,7 @@ class LivePanelView(context: Context) : LinearLayout(context) {
         setPadding(pad, pad, pad, pad)
         // Flat monotone slab: a translucent ink panel that reads on any wallpaper.
         setBackgroundColor(SLAB)
-        addView(time)
+        addView(timeRow)
         addView(date)
         addView(widgetHost)
     }
@@ -81,16 +83,60 @@ class LivePanelView(context: Context) : LinearLayout(context) {
         val timeText = timeFormat.format(now)
         if (timeText == lastRendered) return
         lastRendered = timeText
-        time.text = timeText
+        setTimeChars(timeText)
         date.text = dateFormat.format(now).uppercase(Locale.getDefault())
         animateKinetic()
     }
 
-    /** Restrained kinetic refresh: the time slides up a few dp and fades in on each minute change. */
+    /**
+     * Set the per-character time views (one TextView per glyph). Reuses the existing views and only
+     * adds/removes when the glyph count changes — avoids per-minute allocations and keeps the views
+     * already measured (so the turnstile pivot reads a real height).
+     */
+    private fun setTimeChars(text: String) {
+        if (timeRow.childCount > text.length) {
+            timeRow.removeViews(text.length, timeRow.childCount - text.length)
+        } else {
+            while (timeRow.childCount < text.length) {
+                timeRow.addView(
+                    TextView(context).apply {
+                        setTextColor(HAX_PAPER)
+                        textSize = 48f
+                        letterSpacing = 0.02f
+                        // A large camera distance flattens the perspective so the turnstile reads as
+                        // a crisp swing rather than a heavy fish-eye on big glyphs.
+                        cameraDistance = density * 6000
+                    },
+                )
+            }
+        }
+        for (i in text.indices) {
+            (timeRow.getChildAt(i) as TextView).text = text[i].toString()
+        }
+    }
+
+    /**
+     * WP7 kinetic refresh: each time glyph swings in around its left edge (a turnstile), staggered
+     * left-to-right, with the snappy WP7 decelerate. Posted so the children are measured first (the
+     * pivot needs their height).
+     */
     private fun animateKinetic() {
-        time.translationY = 6 * density
-        time.alpha = 0f
-        time.animate().translationY(0f).alpha(1f).setDuration(280).start()
+        timeRow.post {
+            for (i in 0 until timeRow.childCount) {
+                val c = timeRow.getChildAt(i)
+                c.pivotX = 0f
+                c.pivotY = c.height / 2f
+                c.rotationY = 70f
+                c.alpha = 0f
+                c.animate()
+                    .rotationY(0f)
+                    .alpha(1f)
+                    .setStartDelay((i * 45).toLong())
+                    .setDuration(320)
+                    .setInterpolator(turnstileInterp)
+                    .start()
+            }
+        }
     }
 
     override fun onAttachedToWindow() {
@@ -98,7 +144,7 @@ class LivePanelView(context: Context) : LinearLayout(context) {
         // Prefer a hosted app widget when one is bound; otherwise run the kinetic clock.
         val launcher = com.android.launcher3.Launcher.getLauncher(context) as? app.lawnchair.LawnchairLauncher
         val hosted = launcher != null && LivePanelHost.embed(launcher, widgetHost)
-        time.visibility = if (hosted) GONE else VISIBLE
+        timeRow.visibility = if (hosted) GONE else VISIBLE
         date.visibility = if (hosted) GONE else VISIBLE
         widgetHost.visibility = if (hosted) VISIBLE else GONE
         if (hosted) {
