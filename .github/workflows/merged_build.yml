@@ -1,285 +1,68 @@
 name: Merged Build & Release
 
+# Lunch Heir is an overlay on the upstream Lawnchair submodule, not a flat Android project:
+# there is no root gradlew / app module. The real Gradle project lives in upstream/, and the
+# Lunch Heir source overlay must be applied before building. This mirrors ci.yml's build path
+# and additionally publishes a GitHub Release with the APKs on pushes to main.
+
 on:
   push:
-    branches: [ "**" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
-# ⚡ Concurrency: Cancels the entire job if a new push comes in.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Least-privilege default token for all jobs. The build-and-release job overrides this
-# with the elevated scopes it needs (tags/releases/issues) in its own permissions block.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Inject Google Services
-        env:
-          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
-        run: |
-          if [ -f "app/google-services.json.template" ]; then
-            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
-          fi
-          echo "ARCORE_API_KEY=$ARCORE_API_KEY" >> local.properties
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          cache-read-only: false
-          dependency-graph: disabled
-
-      - name: Run unit tests
-        run: |
-          chmod +x gradlew
-          ./gradlew testDebugUnitTest test --continue --build-cache
-
-      - name: Upload test reports
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: unit-test-reports
-          path: '**/build/reports/tests/'
-
   build-and-release:
-    needs: unit-tests
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
-      checks: read
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - name: Checkout (with upstream submodule)
+        uses: actions/checkout@v4
         with:
+          submodules: recursive
           fetch-depth: 0
 
-      - name: Setup Dependencies
-        run: chmod +x setup_libs.sh && ./setup_libs.sh
-
-      - name: Inject Google Services
-        env:
-          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          ARCORE_API_KEY: ${{ secrets.ARCORE_API_KEY }}
-        run: |
-          if [ -f "app/google-services.json.template" ]; then
-            echo "Template found. Injecting secrets..."
-            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
-          else
-            echo "Warning: google-services.json.template not found. Skipping injection."
-          fi
-
-          # Inject ARCore API Key into local.properties for build.gradle.kts to pick up
-          echo "ARCORE_API_KEY=$ARCORE_API_KEY" >> local.properties
-
-      - name: Decode signing keystore
-        env:
-          KEYSTORE_RAW: ${{ secrets.KEYSTORE_RAW }}
-        run: |
-          # Empty secret (e.g. on a fork without access) → skip; the debug build then signs with the
-          # default debug key rather than failing the whole CI run.
-          if [ -z "$KEYSTORE_RAW" ]; then
-            echo "::warning::KEYSTORE_RAW secret is empty — building with the default debug key."
-            exit 0
-          fi
-          echo "$KEYSTORE_RAW" | base64 -d > app/keystore.jks
-          if [ ! -s app/keystore.jks ]; then
-            echo "::error::Decoded keystore is empty — KEYSTORE_RAW is not valid base64."
-            exit 1
-          fi
-          echo "Keystore decoded to app/keystore.jks ($(stat -c%s app/keystore.jks) bytes)"
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
+          java-version: "21"
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-        with:
-          cache-read-only: false
-          dependency-graph: disabled
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Apply Lunch Heir source overlay
+        run: overlay/apply-overlay.sh
 
-      - name: Build with Gradle
-        id: gradle-build
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          # Consumed by the signingConfigs.release block in app/build.gradle.kts. The debug build type
-          # uses this release config when the keystore is present (see app/build.gradle.kts), keeping
-          # the auto-published artifact's signature stable; absent it, the default debug key is used.
-          KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      - name: Assemble Lunch Heir (github debug)
+        working-directory: upstream
+        run: ./gradlew assembleLawnWithQuickstepGithubDebug
+
+      - name: Collect APKs
+        id: collect
         run: |
-          set +e
-          export BUILD_NUMBER=$(git rev-list --count HEAD)
+          mkdir -p dist
+          find upstream/build/outputs/apk -name '*.apk' -exec cp {} dist/ \;
+          echo "build_number=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+          ls -l dist
 
-          # Build the APK (signing comes from the env-driven signingConfigs.release in Gradle)
-          ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache > build.log 2>&1
-
-          EXIT_CODE=$?
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          cat build.log
-          exit $EXIT_CODE
-
-      # ------------------------------------------------------------------
-      # FAILURE HANDLING
-      # ------------------------------------------------------------------
-      - name: Report Failure to Jules
-        if: failure() && steps.gradle-build.outcome == 'failure'
-        uses: actions/github-script@v7
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            let logTail = 'Log file not found.';
-            try { logTail = fs.readFileSync('build.log', 'utf8').slice(-4000); } catch (e) {}
-            
-            const assignee = 'gemini-code-assist';
-            
-            try {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `Build Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`,
-                body: `@${assignee} /jules debug this build error\n\n**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
-                labels: ['jules', 'bug'],
-                assignees: [assignee]
-              });
-            } catch (error) {
-              console.log("Failed to create issue with assignee. Retrying without assignee.");
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `Build Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`,
-                body: `@${assignee} /jules debug this build error\n\n**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
-                labels: ['jules', 'bug']
-              });
-            }
-
-      # ------------------------------------------------------------------
-      # RELEASE STEPS (Only run on PUSH, not Pull Requests)
-      # ------------------------------------------------------------------
-      - name: Prepare Release Variables
-        if: success() && github.event_name == 'push'
-        id: release_vars
-        run: |
-          export BUILD_NUMBER=$(git rev-list --count HEAD)
-          
-          # Extract version info from properties file
-  
-          MAJOR=$(grep 'versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          MINOR=$(grep 'versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-
-          # Calculate Patch version programmatically based on commits since Minor update
-          MINOR_COMMIT=$(git blame -L '/versionMinor=/',+1 version.properties | awk '{print $1}' | tr -d '^')
-          if [ -n "$MINOR_COMMIT" ]; then
-            PATCH=$(git rev-list --count $MINOR_COMMIT..HEAD)
-          else
-    
-            PATCH=$(grep 'versionPatch=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          fi
-
-          VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
-          
-          TAG_NAME="latest-debug-v${MAJOR}.${MINOR}"
-          
-          # Dynamic App Name from settings.gradle
-          if [ -f "settings.gradle.kts" ]; then
-             APP_NAME=$(grep 'rootProject.name' settings.gradle.kts | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
-          elif [ -f "settings.gradle" ]; then
-             APP_NAME=$(grep 'rootProject.name' settings.gradle | sed -E "s/.*=.*[\"'](.*)[\"']/\1/")
-          else
-             APP_NAME="App"
-          fi
-          
-          # Locate built APK
-          APK_ORIGINAL=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
-          
-          if [ -z "$APK_ORIGINAL" ]; then
-             echo "Error: No APK found to release!"
-             exit 1
-          fi
-
-          TARGET_NAME="${APP_NAME}-${VERSION_NAME}-debug.apk"
-          
-          # Rename for release
-          mv "$APK_ORIGINAL" "$TARGET_NAME"
-          
-          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
-          echo "APK_FILE=$TARGET_NAME" >> $GITHUB_ENV
-          
-          # Package Build Tools (Optional)
-          mkdir -p build_tools_package/tools build_tools_package/native
-          [ -d "app/src/main/assets/tools" ] && cp -r app/src/main/assets/tools/* build_tools_package/tools/ || true
-          [ -d "app/src/main/jniLibs/arm64-v8a" ] && cp -r app/src/main/jniLibs/arm64-v8a/* build_tools_package/native/ || true
-          cd build_tools_package && zip -r ../build-tools.zip . && cd ..
+          name: lunchheir-github-debug
+          path: dist/*.apk
+          if-no-files-found: error
 
       - name: Publish Release
-        if: success() && github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Force update tag to point to current commit
-          git tag -fa $TAG_NAME -m "Latest Debug Build"
-          git push origin $TAG_NAME --force
-
-          BUILD_TOOLS="build-tools.zip"
-
-          # Check if release exists
-          if gh release view $TAG_NAME > /dev/null 2>&1; then
-             echo "Updating existing release..."
-
-             # Clean up ONLY the build-tools asset to avoid conflicts
-             gh release delete-asset "$TAG_NAME" "$BUILD_TOOLS" -y || true
-
-             gh release edit $TAG_NAME --prerelease \
-               --title "Latest Debug Build ($TAG_NAME)" \
-               --notes "Auto-build from commit $GITHUB_SHA" \
-               --target $GITHUB_SHA
-
-             # Clobber ensures that if we re-run the workflow on the exact same commit, it replaces the APK instead of failing.
-             gh release upload $TAG_NAME "$APK_FILE" --clobber
-             [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS" --clobber
-          else
-             echo "Creating new release..."
-             gh release create $TAG_NAME "$APK_FILE" --prerelease \
-               --title "Latest Debug Build ($TAG_NAME)" \
-               --notes "Auto-build from commit $GITHUB_SHA" \
-               --target $GITHUB_SHA
-             [ -f "$BUILD_TOOLS" ] && gh release upload $TAG_NAME "$BUILD_TOOLS" --clobber
-          fi
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ steps.collect.outputs.build_number }}
+          name: Lunch Heir build ${{ steps.collect.outputs.build_number }}
+          files: dist/*.apk
+          generate_release_notes: true

@@ -39,7 +39,10 @@ object NestedFolders {
      */
     @JvmStatic
     fun isEnabled(context: Context): Boolean {
-        if (accepting == null) refresh(context)
-        return accepting ?: false
+        // Double-checked locking: many loader threads may race here on first read; only one hits prefs.
+        return accepting ?: synchronized(this) {
+            accepting ?: LunchHeirPrefs.isEnabled(context, LunchHeirPrefs.Feature.NESTED_FOLDERS)
+                .also { accepting = it }
+        }
     }
 }
