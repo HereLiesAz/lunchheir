@@ -1,115 +1,26 @@
-name: Auto-update Lawnchair submodule
-
-# Keeps the upstream/ submodule tracking the latest Lawnchair 16-dev. Because the Lunch Heir
-# overlay patches upstream source with exact-anchor edits, a bump can only be trusted once the
-# overlay still applies AND the app still builds — so this verifies before proposing the bump:
-#   green  -> opens/updates a PR with the new submodule pointer (review + one-click merge)
-#   red    -> opens an issue naming the stage that broke, so the drifted seam gets re-authored
-# It never pushes a breaking bump to main on its own.
-
+# centralized-by: HereLiesAz/workflows
+# central-source-path: .github/workflows/update-upstream.yml
+# central-source-sha256: 4a479ec3df354d5a9a5707ac70ba08674876bd0704badd89ed8e2856086cdd66
+# This file intentionally contains no repository secrets.
+name: Auto-update Lawnchair submodule [central proxy]
 on:
   schedule:
     - cron: "27 */6 * * *"   # every 6 hours (off-minute); only builds when upstream actually moved
   workflow_dispatch:
-
-concurrency:
-  group: upstream-autobump
-  cancel-in-progress: true
-
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-
+  contents: read
+  id-token: write
 jobs:
-  bump:
+  central-dispatch:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Move submodule to latest 16-dev
-        id: bump
-        run: |
-          # Move to the branch tip via --remote (ignores the recorded pin, which may be unreachable
-          # since 16-dev force-pushes; preserves submodule metadata). BEFORE is the committed
-          # gitlink (read without a checkout); AFTER is the tip.
-          BEFORE=$(git ls-tree HEAD upstream | awk '{print $3}')
-          git submodule update --init --recursive --remote --depth=1 upstream
-          AFTER=$(git -C upstream rev-parse HEAD)
-          echo "before=$BEFORE" >> "$GITHUB_OUTPUT"
-          echo "after=$AFTER" >> "$GITHUB_OUTPUT"
-          if [ "$BEFORE" = "$AFTER" ]; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Already at latest ($AFTER) — nothing to do."
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Lawnchair $BEFORE -> $AFTER"
-          fi
-
-      - name: Set up JDK 21
-        if: steps.bump.outputs.changed == 'true'
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Set up Gradle
-        if: steps.bump.outputs.changed == 'true'
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Verify overlay applies and builds
-        if: steps.bump.outputs.changed == 'true'
-        id: verify
-        run: |
-          set +e
-          overlay/apply-overlay.sh > "$GITHUB_WORKSPACE/apply.log" 2>&1
-          if [ $? -ne 0 ]; then
-            echo "stage=apply-overlay" >> "$GITHUB_OUTPUT"
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-            cat "$GITHUB_WORKSPACE/apply.log"
-            exit 0
-          fi
-          ( cd upstream && ./gradlew assembleLawnWithQuickstepGithubDebug --build-cache ) \
-            > "$GITHUB_WORKSPACE/build.log" 2>&1
-          if [ $? -ne 0 ]; then
-            echo "stage=build" >> "$GITHUB_OUTPUT"
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-            tail -c 4000 "$GITHUB_WORKSPACE/build.log"
-            exit 0
-          fi
-          echo "ok=true" >> "$GITHUB_OUTPUT"
-
-      - name: Commit verified bump to main
-        if: steps.bump.outputs.changed == 'true' && steps.verify.outputs.ok == 'true'
+      - name: Dispatch to HereLiesAz/workflows
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Verified green (overlay applied + GithubDebug built) -> push the bump straight to main.
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add upstream
-          git commit \
-            -m "chore(upstream): bump Lawnchair submodule to ${{ steps.bump.outputs.after }}" \
-            -m "Auto-update from 16-dev. Overlay applied and GithubDebug built clean."
-          git push origin HEAD:main
-
-      - name: Task Jules with the drifted seam
-        if: steps.bump.outputs.changed == 'true' && steps.verify.outputs.ok == 'false'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          STAGE="${{ steps.verify.outputs.stage }}"
-          if [ "$STAGE" = "apply-overlay" ]; then LOG=$(tail -c 4000 "$GITHUB_WORKSPACE/apply.log"); else LOG=$(tail -c 4000 "$GITHUB_WORKSPACE/build.log"); fi
-          # Don't pile up duplicates while a bump is blocked.
-          if gh issue list --state open --search "in:title Upstream bump blocked" | grep -q .; then
-            echo "An open upstream-bump issue already exists; skipping."
-            exit 0
-          fi
-          TITLE="Upstream bump blocked: Lawnchair ${{ steps.bump.outputs.after }} ($STAGE failed)"
-          BODY=$(printf '@gemini-code-assist /jules re-author the drifted Lunch Heir overlay seam.\n\nAuto-update of the upstream submodule to `%s` (from `%s`) failed at **%s** — a Lawnchair change moved an exact-anchor patch in `overlay/apply_overlay.py` (or broke the GithubDebug build). Find the drifted anchor, re-author that one edit against the new upstream so the overlay applies and the GithubDebug flavor builds, then push the fix. A manual run of this workflow (or the next scheduled run) will retry the bump.\n\n```\n%s\n```' "${{ steps.bump.outputs.after }}" "${{ steps.bump.outputs.before }}" "$STAGE" "$LOG")
-          # Mirror the original failure handler: assign Jules, falling back to an unassigned issue.
-          gh issue create --title "$TITLE" --assignee gemini-code-assist --body "$BODY" \
-            || gh issue create --title "$TITLE" --body "$BODY"
+          WORKFLOWS_GATEWAY_URL: ${{ vars.WORKFLOWS_GATEWAY_URL }}
+          EVENT_JSON: ${{ toJSON(github.event) }}
+          INPUTS_JSON: ${{ toJSON(inputs) }}
+          VARS_JSON: ${{ toJSON(vars) }}
+          SOURCE_WORKFLOW_PATH: .github/workflows/update-upstream.yml
+          SOURCE_SHA256: 4a479ec3df354d5a9a5707ac70ba08674876bd0704badd89ed8e2856086cdd66
+        shell: bash
+        run: "set -euo pipefail\n[[ -n \"${WORKFLOWS_GATEWAY_URL:-}\" ]] || { echo \"Repository variable WORKFLOWS_GATEWAY_URL is not configured.\" >&2; exit 1; }\noidc_response=\"$(curl --fail-with-body --silent --show-error -H \"Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}\" \"${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=hereliesaz-workflows\")\"\noidc_token=\"$(jq -r '.value // empty' <<<\"$oidc_response\")\"\n[[ -n \"$oidc_token\" ]] || { echo \"GitHub did not issue an OIDC token.\" >&2; exit 1; }\necho \"::add-mask::$oidc_token\"\npayload=\"$(jq -n   --arg repository \"$GITHUB_REPOSITORY\" --arg repository_id \"$GITHUB_REPOSITORY_ID\"   --arg repository_owner \"$GITHUB_REPOSITORY_OWNER\" --arg repository_owner_id \"$GITHUB_REPOSITORY_OWNER_ID\"   --arg sha \"$GITHUB_SHA\" --arg ref \"$GITHUB_REF\" --arg ref_name \"$GITHUB_REF_NAME\" --arg ref_type \"$GITHUB_REF_TYPE\"   --arg head_ref \"$GITHUB_HEAD_REF\" --arg base_ref \"$GITHUB_BASE_REF\" --arg actor \"$GITHUB_ACTOR\" --arg actor_id \"$GITHUB_ACTOR_ID\"   --arg event_name \"$GITHUB_EVENT_NAME\" --arg run_id \"$GITHUB_RUN_ID\" --arg run_number \"$GITHUB_RUN_NUMBER\" --arg run_attempt \"$GITHUB_RUN_ATTEMPT\"   --arg workflow_ref \"$GITHUB_WORKFLOW_REF\" --arg workflow_name \"$GITHUB_WORKFLOW\" --arg source_workflow_path \"$SOURCE_WORKFLOW_PATH\"   --arg source_sha256 \"$SOURCE_SHA256\" --argjson event \"$EVENT_JSON\" --argjson inputs \"$INPUTS_JSON\" --argjson vars \"$VARS_JSON\"   '{repository:$repository,repository_id:$repository_id,repository_owner:$repository_owner,repository_owner_id:$repository_owner_id,sha:$sha,check_sha:($event.pull_request.head.sha // $sha),ref:$ref,ref_name:$ref_name,ref_type:$ref_type,head_ref:$head_ref,base_ref:$base_ref,actor:$actor,actor_id:$actor_id,event_name:$event_name,event:$event,inputs:$inputs,vars:$vars,run_id:$run_id,run_number:$run_number,run_attempt:$run_attempt,workflow_ref:$workflow_ref,workflow_name:$workflow_name,source_workflow_path:$source_workflow_path,source_sha256:$source_sha256}')\"\ncurl --fail-with-body --silent --show-error -X POST \"${WORKFLOWS_GATEWAY_URL%/}/dispatch\" -H \"Authorization: Bearer ${oidc_token}\" -H \"Content-Type: application/json\" --data-binary \"$payload\""
